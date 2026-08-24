@@ -1,8 +1,8 @@
 from __future__ import annotations
-
 import argparse
 import base64
 import io
+import json
 import os
 import sys
 
@@ -17,10 +17,7 @@ from pydantic import BaseModel, Field
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
-
-# Vendor search
 from vendor_search import search_vendors
-
 
 # ============================================================
 # 1. CONFIGURATION
@@ -65,7 +62,6 @@ CategoryKey = Literal[
 
 
 CATEGORY_INFO = {
-
     "paper_cardboard": {
         "label": "Paper & cardboard",
         "vendor_type": "Paper/cardboard recycler",
@@ -119,6 +115,10 @@ SAFETY_CRITICAL = {
 # ============================================================
 
 class DetectedItem(BaseModel):
+    """
+    Represents one physically distinct waste item
+    detected in the image.
+    """
 
     description: str = Field(
         description="Short description of the object, e.g. plastic bottle"
@@ -140,6 +140,9 @@ class DetectedItem(BaseModel):
 
 
 class WasteClassification(BaseModel):
+    """
+    Complete analysis of a waste image.
+    """
 
     primary_category: CategoryKey = Field(
         description="Main waste category based on the dominant material"
@@ -207,12 +210,14 @@ The ONLY allowed categories are:
 6. E-waste
 7. Hazardous
 8. General / landfill
+9. Reuse
+
 
 IMPORTANT RULES:
 
 1. Identify every distinct waste item you can see.
-
 2. Classify based on the MATERIAL, not the object's purpose.
+
 
 3. Look for visual material clues:
    - Plastic: resin markings, mould seams, plastic texture
@@ -228,6 +233,7 @@ IMPORTANT RULES:
 5. If hazardous material is present or suspected:
    - Set hazard_flag = true.
    - Explain the hazard.
+   - Do not ignore it even if it is a small part of the image.
 
 6. E-waste should include electronics such as:
    - phones
@@ -273,7 +279,7 @@ classify each item,
 identify the primary waste category,
 check whether the image contains mixed waste,
 flag hazardous or electronic waste,
-and mention any contamination.
+and mention any contamination.If the product is categorized as reuse give an realistic instruction on how it can be reused.
 """
 
 
@@ -359,6 +365,7 @@ class Result:
 
         c = self.classification
 
+        # Higher threshold for safety-critical categories
         if (
             c.primary_category in SAFETY_CRITICAL
             or c.hazard_flag
@@ -392,6 +399,7 @@ class WasteClassifier:
             max_retries=3,
         )
 
+        # Force Gemini to return our Pydantic structure
         self.chain = llm.with_structured_output(
             WasteClassification,
             method="json_schema"
@@ -430,7 +438,7 @@ class WasteClassifier:
 
 
 # ============================================================
-# 8. PRINT RESULT + VENDOR SEARCH
+# 8. PRINT RESULT
 # ============================================================
 
 def print_result(result: Result):
@@ -439,20 +447,12 @@ def print_result(result: Result):
 
     print(f"IMAGE: {result.path.name}")
 
-    # --------------------------------------------------------
-    # Error
-    # --------------------------------------------------------
-
     if result.classification is None:
 
         print("ERROR:")
         print(result.error)
 
         return
-
-    # --------------------------------------------------------
-    # Classification
-    # --------------------------------------------------------
 
     c = result.classification
 
@@ -499,10 +499,6 @@ def print_result(result: Result):
             f"{c.contamination_notes}"
         )
 
-    # --------------------------------------------------------
-    # Detected items
-    # --------------------------------------------------------
-
     print("\nDetected items:")
 
     for item in c.items:
@@ -529,61 +525,6 @@ def print_result(result: Result):
     print(
         f"\nReasoning: {c.reasoning}"
     )
-
-    # ========================================================
-    # VENDOR SEARCH
-    # ========================================================
-
-    print("\n🏭 Matching Vendors:")
-
-    try:
-
-        vendors = search_vendors(
-            c.primary_category
-        )
-
-        if vendors:
-
-            for vendor in vendors:
-
-                print(
-                    f"  - {vendor['name']}"
-                )
-
-                # Print extra information if it exists
-                if "type" in vendor:
-                    print(
-                        f"    Type     : "
-                        f"{vendor['type']}"
-                    )
-
-                if "location" in vendor:
-                    print(
-                        f"    Location : "
-                        f"{vendor['location']}"
-                    )
-
-                if "contact" in vendor:
-                    print(
-                        f"    Contact  : "
-                        f"{vendor['contact']}"
-                    )
-
-        else:
-
-            print(
-                "  No matching vendors found."
-            )
-
-    except Exception as exc:
-
-        print(
-            f"  ❌ Vendor search error: {exc}"
-        )
-
-    # --------------------------------------------------------
-    # Human review
-    # --------------------------------------------------------
 
     if result.needs_review:
 
@@ -615,16 +556,75 @@ def collect_images(
 # ============================================================
 # 10. MAIN
 # ============================================================
+
+def main():
+
+    parser = argparse.ArgumentParser(
+        description="AI Waste Classification"
+    )
+
+    parser.add_argument(
+        "target",
+        type=Path,
+        help="Image file or folder"
+    )
+
+    parser.add_argument(
+        "--model",
+        default=MODEL_NAME,
+        help="Gemini model"
+    )
+
+    args = parser.parse_args()
+
+    if not args.target.exists():
+
+        print(
+            f"File not found: {args.target}",
+            file=sys.stderr
+        )
+
+        return 1
+
+    images = collect_images(
+        args.target
+    )
+
+    if not images:
+
+        print(
+            "No images found.",
+            file=sys.stderr
+        )
+
+        return 1
+
+    classifier = WasteClassifier(
+        model=args.model
+    )
+
+    print(
+        f"Analyzing {len(images)} image(s)..."
+    )
+
+    for image in images:
+
+        result = classifier.classify(
+            image
+        )
+
+        print_result(result)
+
+    return 0
+
+# ============================================================
+# 10. MAIN
+# ============================================================
+
 if __name__ == "__main__":
 
-    # Folder containing this Python file
-    BASE_DIR = Path(__file__).resolve().parent
+    image_path = Path(__file__).resolve().parent / "images" / "test1.jfif"
 
-    # images/test1.jfif
-    image_path = BASE_DIR / "images" / "test1.jfif"
-
-    print(f"Python file: {__file__}")
-    print(f"Base directory: {BASE_DIR}")
     print(f"Image path: {image_path}")
 
     if not image_path.exists():
