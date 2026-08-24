@@ -1,0 +1,65 @@
+using System.Security.Claims;
+using AuthService.Api.Contracts;
+using AuthService.Api.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace AuthService.Api.Controllers;
+
+[ApiController]
+[Route("api/auth")]
+public class AuthController : ControllerBase
+{
+    private readonly IAuthenticationService _authenticationService;
+
+    public AuthController(IAuthenticationService authenticationService)
+    {
+        _authenticationService = authenticationService;
+    }
+
+    [HttpPost("register")]
+    public async Task<ActionResult<UserResponse>> Register(RegisterRequest request, CancellationToken ct)
+    {
+        var user = await _authenticationService.RegisterAsync(request.Email, request.Password, ct);
+        return Ok(user);
+    }
+
+    [HttpPost("login")]
+    public async Task<ActionResult<TokenResponse>> Login(LoginRequest request, CancellationToken ct)
+    {
+        var tokens = await _authenticationService.LoginAsync(request.Email, request.Password, ct);
+        return Ok(tokens);
+    }
+
+    [HttpPost("google")]
+    public async Task<ActionResult<TokenResponse>> GoogleLogin(GoogleLoginRequest request, CancellationToken ct)
+    {
+        var tokens = await _authenticationService.LoginWithGoogleAsync(request.IdToken, ct);
+        return Ok(tokens);
+    }
+
+    [HttpPost("refresh")]
+    public async Task<ActionResult<TokenResponse>> Refresh(RefreshRequest request, CancellationToken ct)
+    {
+        var tokens = await _authenticationService.RefreshAsync(request.RefreshToken, ct);
+        return Ok(tokens);
+    }
+
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout(LogoutRequest request, CancellationToken ct)
+    {
+        await _authenticationService.LogoutAsync(request.RefreshToken, ct);
+        return NoContent();
+    }
+
+    [Authorize]
+    [HttpGet("me")]
+    public async Task<ActionResult<UserResponse>> Me(CancellationToken ct)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue("sub")!);
+
+        var user = await _authenticationService.GetUserAsync(userId, ct);
+        return Ok(user);
+    }
+}

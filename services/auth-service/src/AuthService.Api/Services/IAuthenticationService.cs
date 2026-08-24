@@ -1,0 +1,13 @@
+using AuthService.Api.Contracts;
+
+namespace AuthService.Api.Services;
+
+public interface IAuthenticationService
+{
+    Task<UserResponse> RegisterAsync(string email, string password, CancellationToken ct);
+    Task<TokenResponse> LoginAsync(string email, string password, CancellationToken ct);
+    Task<TokenResponse> LoginWithGoogleAsync(string idToken, CancellationToken ct);
+    Task<TokenResponse> RefreshAsync(string refreshToken, CancellationToken ct);
+    Task LogoutAsync(string refreshToken, CancellationToken ct);
+    Task<UserResponse> GetUserAsync(Guid userId, CancellationToken ct);
+}
