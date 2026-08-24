@@ -1,0 +1,44 @@
+[
+    {
+        "id": 1,
+        "name": "Green Plastic Recycling",
+        "categories": ["plastics"],
+        "location": "Cairo",
+        "vendor_type": "Plastic Recycler"
+    },
+    {
+        "id": 2,
+        "name": "Cairo Paper Recycling",
+        "categories": ["paper_cardboard"],
+        "location": "Cairo",
+        "vendor_type": "Paper & Cardboard Recycler"
+    },
+    {
+        "id": 3,
+        "name": "Egypt Metal Recycling",
+        "categories": ["metal"],
+        "location": "Cairo",
+        "vendor_type": "Metal Recycler"
+    },
+    {
+        "id": 4,
+        "name": "Glass Recycling Center",
+        "categories": ["glass"],
+        "location": "Cairo",
+        "vendor_type": "Glass Recycler"
+    },
+    {
+        "id": 5,
+        "name": "Organic Waste Solutions",
+        "categories": ["organic_food"],
+        "location": "Cairo",
+        "vendor_type": "Composting / Organic Waste"
+    },
+    {
+        "id": 6,
+        "name": "Certified E-Waste Egypt",
+        "categories": ["e_waste"],
+        "location": "Cairo",
+        "vendor_type": "E-Waste Recycler"
+    }
+]

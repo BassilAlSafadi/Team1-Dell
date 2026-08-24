@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import argparse
 import base64
 import io
@@ -32,7 +31,7 @@ if not API_KEY:
     raise ValueError("GEMINI_API_KEY not found in .env")
 
 
-MODEL_NAME = "gemini-3.7-flash"
+MODEL_NAME = "gemini-3.6-flash"
 
 IMAGE_SUFFIXES = {
     ".jpg",
@@ -624,14 +623,23 @@ def main():
 
 if __name__ == "__main__":
 
-    # Image we want to test
-    image_path = Path("images/test1.jfif")
+    image_path = Path(__file__).resolve().parent / "images" / "test1.jfif"
 
-    # Create classifier
+    print(f"Image path: {image_path}")
+
+    if not image_path.exists():
+        print("❌ Image does not exist!")
+        sys.exit(1)
+
+    print("✅ Image found")
+    print("🚀 Sending image to Gemini...")
+
     classifier = WasteClassifier()
 
-    # Analyze image
+    print("⏳ Waiting for Gemini response...")
+
     result = classifier.classify(image_path)
 
-    # Print result
+    print("✅ Gemini response received")
+
     print_result(result)
