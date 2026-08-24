@@ -1,0 +1,9 @@
+langchain-core
+langchain-google-genai
+langchain-huggingface
+langchain-chroma
+langchain-text-splitters
+sentence-transformers
+chromadb
+pymupdf
+python-dotenv

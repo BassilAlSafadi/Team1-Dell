@@ -3,3 +3,14 @@
 # .NET build output
 bin/
 obj/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# ai-service RAG data: PDFs, OCR cache and vector store are regenerable/large and
+# shouldn't be committed. See services/ai-service/data/source_pdfs/README.md.
+services/ai-service/data/source_pdfs/*.pdf
+services/ai-service/data/ocr_cache/
+services/ai-service/data/vector_store/
