@@ -625,7 +625,7 @@ def main():
 if __name__ == "__main__":
 
     # Image we want to test
-    image_path = Path("phase1/images/test1.jfif")
+    image_path = Path("images/test1.jfif")
 
     # Create classifier
     classifier = WasteClassifier()
