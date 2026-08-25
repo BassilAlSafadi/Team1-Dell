@@ -1,0 +1,13 @@
+__pycache__/
+**/__pycache__/
+*.pyc
+.env
+.env.*
+!*.env.example
+data/ocr_cache/
+data/vector_store/
+data/source_pdfs/*.pdf
+images/
+tempCodeRunnerFile.py
+python=on
+.venv/

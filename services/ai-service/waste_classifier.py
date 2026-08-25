@@ -15,11 +15,16 @@ from PIL import Image, ImageOps
 
 from pydantic import BaseModel, Field
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 # Vendor search
 from vendor_search import search_vendors
+
+# Agentic RAG: reuse the same Chroma-backed tools (and vector store built by
+# `python -m chatbot.ingest`) that the chat assistant uses, so the classifier consults
+# the same knowledge base instead of maintaining a second copy of it.
+from chatbot.tools import search_egypt_waste_law, search_recycling_guide
 
 
 # ============================================================
@@ -46,6 +51,12 @@ IMAGE_SUFFIXES = {
 }
 
 MAX_EDGE_PX = 1024
+
+# Agentic RAG: the model decides per image whether either knowledge base is worth
+# consulting before it commits to a classification.
+RAG_TOOLS = [search_egypt_waste_law, search_recycling_guide]
+RAG_TOOLS_BY_NAME = {t.name: t for t in RAG_TOOLS}
+MAX_TOOL_ROUNDS = 3
 
 
 # ============================================================
@@ -207,6 +218,9 @@ The ONLY allowed categories are:
 6. E-waste
 7. Hazardous
 8. General / landfill
+9. Mixed waste (if multiple categories are present)
+10. Contaminated (if contamination is present)
+11. Reuse 
 
 IMPORTANT RULES:
 
@@ -256,6 +270,22 @@ IMPORTANT RULES:
 
 10. If you are uncertain, give a LOW confidence score.
 Do not pretend to be certain.
+
+TOOLS:
+You have two knowledge-base search tools available. Decide for yourself, per image,
+whether either is worth calling — do not call a tool when the material and its correct
+handling are already obvious to you.
+
+- search_egypt_waste_law: search Egypt's Waste Management Law No. 202/2020. Use this
+  when it's unclear whether an item is legally hazardous or e-waste, or when a legal
+  definition would change primary_category or hazard_flag.
+- search_recycling_guide: search the recycling how-to guide. Use this when you're
+  unsure how a material should be sorted, stored or handled, to ground
+  contamination_notes or material_evidence.
+
+You may call a tool more than once, and you may call both, before giving your final
+answer. When you do use a tool, ground hazard_reason, contamination_notes and reasoning
+in what it returned, and cite the source (e.g. the law article number) where relevant.
 
 Confidence guidelines:
 - 0.90+ = very clear material
@@ -392,7 +422,13 @@ class WasteClassifier:
             max_retries=3,
         )
 
-        self.chain = llm.with_structured_output(
+        # Two bindings of the same model: one free to call the RAG tools while it
+        # reasons, one locked to the structured schema for the final answer. Gemini
+        # doesn't reliably emit both tool calls and a structured JSON payload in the
+        # same turn, so retrieval and the final classification are separate calls over
+        # the same message history.
+        self.tool_llm = llm.bind_tools(RAG_TOOLS)
+        self.structured_llm = llm.with_structured_output(
             WasteClassification,
             method="json_schema"
         )
@@ -401,6 +437,37 @@ class WasteClassifier:
             content=SYSTEM_PROMPT
         )
 
+    def _run_agentic_retrieval(self, messages: list) -> None:
+        """Lets the model decide whether to consult the Egyptian waste law and/or the
+        recycling guide before classifying. Appends any tool-call and tool-result
+        messages to `messages` in place; leaves it untouched if no tool is ever
+        called."""
+
+        for _ in range(MAX_TOOL_ROUNDS):
+
+            ai_message = self.tool_llm.invoke(messages)
+            messages.append(ai_message)
+
+            if not ai_message.tool_calls:
+                return
+
+            for tool_call in ai_message.tool_calls:
+
+                print(
+                    f"  🔎 Consulting {tool_call['name']}({tool_call['args']})...",
+                    file=sys.stderr,
+                )
+
+                tool_fn = RAG_TOOLS_BY_NAME[tool_call["name"]]
+                result = tool_fn.invoke(tool_call["args"])
+
+                messages.append(
+                    ToolMessage(
+                        content=str(result),
+                        tool_call_id=tool_call["id"],
+                    )
+                )
+
     def classify(
         self,
         path: Path
@@ -408,12 +475,27 @@ class WasteClassifier:
 
         try:
 
-            output = self.chain.invoke(
-                [
-                    self.system,
-                    build_message(path)
-                ]
+            messages: list = [
+                self.system,
+                build_message(path),
+            ]
+
+            self._run_agentic_retrieval(messages)
+
+            # The retrieval loop can end on an assistant turn (the model's own text
+            # reply once it stops calling tools), which Gemini won't generate from
+            # directly. Add an explicit final turn so the structured-output call
+            # always has a user/function message to respond to.
+            messages.append(
+                HumanMessage(
+                    content=(
+                        "Using the image and anything the tools returned above, give "
+                        "your final waste classification now."
+                    )
+                )
             )
+
+            output = self.structured_llm.invoke(messages)
 
             return Result(
                 path=path,
