@@ -1,0 +1,9 @@
+target-version = "py311"
+line-length = 100
+exclude = ["tempCodeRunnerFile.py", "python=on", "__pycache__", "data"]
+
+[lint]
+select = ["E", "F", "I", "W"]
+
+[lint.per-file-ignores]
+"_db_smoke_test.py" = ["F401"]

@@ -1,0 +1,9 @@
+**/bin/
+**/obj/
+**/.vs/
+.env
+.env.*
+!*.env.example
+*.user
+db/
+TransactionService.Api.http

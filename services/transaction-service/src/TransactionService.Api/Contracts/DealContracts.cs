@@ -1,0 +1,25 @@
+namespace TransactionService.Api.Contracts;
+
+public record TransitionDealRequest(string NewStatus, string? Reason);
+
+public record DealResponse(
+    Guid DealId,
+    Guid OfferId,
+    Guid ListingId,
+    Guid BuyerId,
+    Guid SellerId,
+    decimal AgreedAmount,
+    string Currency,
+    string Status,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? CompletedAt,
+    DateTimeOffset? CancelledAt);
+
+public record DealStatusHistoryResponse(
+    Guid HistoryId,
+    Guid DealId,
+    string? PreviousStatus,
+    string NewStatus,
+    Guid? ChangedBy,
+    DateTimeOffset ChangedAt,
+    string? Reason);
