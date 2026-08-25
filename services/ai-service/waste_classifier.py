@@ -19,7 +19,12 @@ from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 # Vendor search
-from vendor_search import search_vendors
+from vendor_search import search_vendors_for_categories
+
+# Persistence
+from db.repository import save_classification
+from db.schemas import ClassificationRecord
+from identity import DEMO_USER_ID
 
 # Agentic RAG: reuse the same Chroma-backed tools (and vector store built by
 # `python -m chatbot.ingest`) that the chat assistant uses, so the classifier consults
@@ -404,7 +409,78 @@ class Result:
 
 
 # ============================================================
-# 7. GEMINI WASTE CLASSIFIER
+# 6.5 PERSIST CLASSIFICATION
+# ============================================================
+
+def save_classification_result(result: Result, user_id: str) -> str | None:
+    """Persists a successful classification to the waste_classifications
+    collection, so waste_recommendations.py can build trend data from real
+    scan history instead of mock data. No-ops on a failed classification."""
+
+    if result.classification is None:
+        return None
+
+    c = result.classification
+
+    return save_classification(
+        ClassificationRecord(
+            user_id=user_id,
+            image_name=result.path.name,
+            primary_category=c.primary_category,
+            confidence=c.confidence,
+            is_mixed=c.is_mixed,
+            hazard_flag=c.hazard_flag,
+            hazard_reason=c.hazard_reason,
+            contamination_notes=c.contamination_notes,
+            reasoning=c.reasoning,
+            items=[item.model_dump() for item in c.items],
+        )
+    )
+
+
+# ============================================================
+# 7. VENDOR RECOMMENDATIONS
+# ============================================================
+#
+# A single image can contain several kinds of waste (e.g. plastic bottles
+# *and* cardboard boxes), so vendor matching runs per detected category, not
+# just against primary_category. Gemini stays responsible for classification;
+# vendor_search.py stays responsible for vendor matching — this glue just
+# extracts the categories Gemini actually found and hands them off.
+# ============================================================
+
+def get_detected_categories(
+    classification: WasteClassification
+) -> list[CategoryKey]:
+    """Unique item categories from the classification, in first-seen order.
+    Falls back to primary_category only if the model returned no items."""
+
+    categories = list(
+        dict.fromkeys(
+            item.category for item in classification.items
+        )
+    )
+
+    return categories or [classification.primary_category]
+
+
+def recommend_vendors(
+    classification: WasteClassification,
+    business_location: str | None = None,
+) -> dict[str, list[dict]]:
+    """Vendor recommendations grouped by every waste category detected in the
+    image."""
+
+    categories = get_detected_categories(classification)
+
+    return search_vendors_for_categories(
+        categories,
+        business_location=business_location,
+    )
+
+
+# ============================================================
+# 8. GEMINI WASTE CLASSIFIER
 # ============================================================
 
 class WasteClassifier:
@@ -512,10 +588,10 @@ class WasteClassifier:
 
 
 # ============================================================
-# 8. PRINT RESULT + VENDOR SEARCH
+# 9. PRINT RESULT + VENDOR SEARCH
 # ============================================================
 
-def print_result(result: Result):
+def print_result(result: Result, business_location: str | None = None):
 
     print("\n" + "=" * 60)
 
@@ -620,42 +696,51 @@ def print_result(result: Result):
 
     try:
 
-        vendors = search_vendors(
-            c.primary_category
+        vendors_by_category = recommend_vendors(
+            c,
+            business_location=business_location,
         )
 
-        if vendors:
+        for category, vendors in vendors_by_category.items():
 
-            for vendor in vendors:
+            print(
+                f"\n{CATEGORY_INFO[category]['label'].upper()}"
+            )
+
+            if not vendors:
 
                 print(
-                    f"  - {vendor['name']}"
+                    "  No matching vendors found."
+                )
+
+                continue
+
+            for i, vendor in enumerate(vendors, start=1):
+
+                print(
+                    f"{i}. {vendor['name']}"
                 )
 
                 # Print extra information if it exists
-                if "type" in vendor:
+                if "offer_price" in vendor:
                     print(
-                        f"    Type     : "
-                        f"{vendor['type']}"
+                        f"   {vendor['offer_price']} EGP/kg"
                     )
 
                 if "location" in vendor:
                     print(
-                        f"    Location : "
-                        f"{vendor['location']}"
+                        f"   {vendor['location']}"
                     )
 
-                if "contact" in vendor:
+                if "pickup_available" in vendor:
+                    pickup = (
+                        "Available"
+                        if vendor["pickup_available"]
+                        else "Not available"
+                    )
                     print(
-                        f"    Contact  : "
-                        f"{vendor['contact']}"
+                        f"   Pickup: {pickup}"
                     )
-
-        else:
-
-            print(
-                "  No matching vendors found."
-            )
 
     except Exception as exc:
 
@@ -675,7 +760,7 @@ def print_result(result: Result):
 
 
 # ============================================================
-# 9. FIND IMAGES
+# 10. FIND IMAGES
 # ============================================================
 
 def collect_images(
@@ -695,7 +780,7 @@ def collect_images(
 
 
 # ============================================================
-# 10. MAIN
+# 11. MAIN
 # ============================================================
 if __name__ == "__main__":
 
@@ -704,6 +789,9 @@ if __name__ == "__main__":
 
     # images/test1.jfif
     image_path = BASE_DIR / "images" / "test1.jfif"
+
+    # Demo business location, used to prioritize same-location vendors.
+    BUSINESS_LOCATION = "Nasr City"
 
     print(f"Python file: {__file__}")
     print(f"Base directory: {BASE_DIR}")
@@ -724,4 +812,6 @@ if __name__ == "__main__":
 
     print("✅ Gemini response received")
 
-    print_result(result)
+    save_classification_result(result, user_id=DEMO_USER_ID)
+
+    print_result(result, business_location=BUSINESS_LOCATION)

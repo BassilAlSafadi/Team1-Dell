@@ -13,6 +13,8 @@ logging.getLogger("google_genai.models").setLevel(logging.ERROR)
 
 from chatbot import config
 from chatbot.agent import build_llm, new_conversation, run_turn
+from db.repository import add_message, create_thread
+from identity import DEMO_USER_ID
 
 
 def main() -> None:
@@ -26,6 +28,7 @@ def main() -> None:
 
     llm = build_llm()
     messages = new_conversation()
+    thread_id = create_thread(DEMO_USER_ID)
 
     print("Recycling assistant ready. Type END to quit.\n")
 
@@ -44,9 +47,19 @@ def main() -> None:
             continue
 
         messages.append(HumanMessage(content=user_input))
+        add_message(thread_id, "human", user_input)
+
         print("\nAssistant: ", end="", flush=True)
-        run_turn(messages, llm, on_chunk=lambda text: print(text, end="", flush=True))
+        response_chunks: list[str] = []
+
+        def on_chunk(text: str) -> None:
+            print(text, end="", flush=True)
+            response_chunks.append(text)
+
+        run_turn(messages, llm, on_chunk=on_chunk)
         print("\n")
+
+        add_message(thread_id, "ai", "".join(response_chunks))
 
 
 if __name__ == "__main__":

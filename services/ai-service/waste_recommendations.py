@@ -1,10 +1,13 @@
+import os
 from collections import Counter, defaultdict
 from datetime import datetime
-import os
 
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 
+from db.repository import list_classifications_for_user, save_recommendation
+from db.schemas import RecommendationRecord
+from identity import DEMO_USER_ID
 
 # ============================================================
 # 1. CONFIGURATION
@@ -21,119 +24,48 @@ MODEL_NAME = "gemini-3.6-flash"
 
 
 # ============================================================
-# 2. MOCK WASTE SCANS
+# 2. WASTE SCANS FROM CLASSIFICATION HISTORY
 # ============================================================
 #
-# These simulate the scans that will eventually come
-# from the database.
-#
-# Each scan contains:
+# Each scan fed into analyze_waste()/analyze_weekly_trends() needs:
 # - category
 # - item
 # - date
 #
-# The dates allow us to test weekly trends.
+# The dates allow us to test weekly trends. These come from the real
+# waste_classifications history saved by waste_classifier.py, not from
+# hand-written sample data.
 # ============================================================
 
-mock_scans = [
+def load_scans(user_id: str, limit: int = 200) -> list[dict]:
+    """Flattens a user's saved classifications into the scan shape above —
+    one scan per detected item, since a single classification can cover
+    several waste categories at once."""
 
-    # --------------------------------------------------------
-    # Week 31
-    # --------------------------------------------------------
+    classifications = list_classifications_for_user(user_id, limit=limit)
 
-    {
-        "category": "plastics",
-        "item": "plastic bottle",
-        "date": "2026-07-27",
-    },
+    scans = []
 
-    {
-        "category": "plastics",
-        "item": "plastic bottle",
-        "date": "2026-07-29",
-    },
+    for record in classifications:
+        date = record["created_at"].strftime("%Y-%m-%d")
+        items = record.get("items") or []
 
+        if not items:
+            scans.append({
+                "category": record["primary_category"],
+                "item": record.get("image_name") or record["primary_category"],
+                "date": date,
+            })
+            continue
 
-    # --------------------------------------------------------
-    # Week 32
-    # --------------------------------------------------------
+        for item in items:
+            scans.append({
+                "category": item["category"],
+                "item": item["description"],
+                "date": date,
+            })
 
-    {
-        "category": "plastics",
-        "item": "plastic bottle",
-        "date": "2026-08-03",
-    },
-
-    {
-        "category": "plastics",
-        "item": "plastic container",
-        "date": "2026-08-04",
-    },
-
-    {
-        "category": "paper_cardboard",
-        "item": "cardboard box",
-        "date": "2026-08-05",
-    },
-
-    {
-        "category": "organic_food",
-        "item": "food waste",
-        "date": "2026-08-06",
-    },
-
-
-    # --------------------------------------------------------
-    # Week 33
-    # --------------------------------------------------------
-
-    {
-        "category": "plastics",
-        "item": "plastic bottle",
-        "date": "2026-08-10",
-    },
-
-    {
-        "category": "plastics",
-        "item": "plastic bottle",
-        "date": "2026-08-11",
-    },
-
-    {
-        "category": "plastics",
-        "item": "plastic container",
-        "date": "2026-08-12",
-    },
-
-    {
-        "category": "paper_cardboard",
-        "item": "cardboard box",
-        "date": "2026-08-13",
-    },
-
-
-    # --------------------------------------------------------
-    # Week 34
-    # --------------------------------------------------------
-
-    {
-        "category": "plastics",
-        "item": "plastic cup",
-        "date": "2026-08-17",
-    },
-
-    {
-        "category": "plastics",
-        "item": "plastic packaging",
-        "date": "2026-08-18",
-    },
-
-    {
-        "category": "glass",
-        "item": "glass bottle",
-        "date": "2026-08-19",
-    },
-]
+    return scans
 
 
 # ============================================================
@@ -820,14 +752,15 @@ RECOMMENDED ACTIONS:
 
 if __name__ == "__main__":
 
-
     # --------------------------------------------------------
     # STEP 1
-    # Analyze overall waste
+    # Load real scan history and analyze overall waste
     # --------------------------------------------------------
 
+    scans = load_scans(DEMO_USER_ID)
+
     analysis = analyze_waste(
-        mock_scans
+        scans
     )
 
 
@@ -840,7 +773,7 @@ if __name__ == "__main__":
 
         trend_analysis = (
             analyze_weekly_trends(
-                mock_scans
+                scans
             )
         )
 
@@ -850,7 +783,24 @@ if __name__ == "__main__":
         # Ask Gemini for recommendations
         # ----------------------------------------------------
 
-        generate_ai_recommendation(
+        recommendation_text = generate_ai_recommendation(
             analysis,
             trend_analysis
         )
+
+
+        # ----------------------------------------------------
+        # STEP 4
+        # Persist the recommendation
+        # ----------------------------------------------------
+
+        if recommendation_text:
+
+            save_recommendation(
+                RecommendationRecord(
+                    user_id=DEMO_USER_ID,
+                    analysis=analysis,
+                    trend_analysis=trend_analysis,
+                    recommendation_text=recommendation_text,
+                )
+            )

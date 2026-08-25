@@ -3,42 +3,63 @@
         "id": 1,
         "name": "Green Plastic Recycling",
         "categories": ["plastics"],
-        "location": "Cairo",
-        "vendor_type": "Plastic Recycler"
+        "location": "Nasr City",
+        "vendor_type": "Plastic Recycler",
+        "offer_price": 12,
+        "pickup_available": true
     },
     {
         "id": 2,
-        "name": "Cairo Paper Recycling",
-        "categories": ["paper_cardboard"],
-        "location": "Cairo",
-        "vendor_type": "Paper & Cardboard Recycler"
+        "name": "Premium Plastic Buyers",
+        "categories": ["plastics"],
+        "location": "Nasr City",
+        "vendor_type": "Plastic Recycler",
+        "offer_price": 15,
+        "pickup_available": true
     },
     {
         "id": 3,
-        "name": "Egypt Metal Recycling",
-        "categories": ["metal"],
-        "location": "Cairo",
-        "vendor_type": "Metal Recycler"
+        "name": "Cairo Paper Recycling",
+        "categories": ["paper_cardboard"],
+        "location": "Heliopolis",
+        "vendor_type": "Paper & Cardboard Recycler",
+        "offer_price": 5,
+        "pickup_available": true
     },
     {
         "id": 4,
-        "name": "Glass Recycling Center",
-        "categories": ["glass"],
+        "name": "Egypt Metal Recycling",
+        "categories": ["metal"],
         "location": "Cairo",
-        "vendor_type": "Glass Recycler"
+        "vendor_type": "Metal Recycler",
+        "offer_price": 8,
+        "pickup_available": true
     },
     {
         "id": 5,
-        "name": "Organic Waste Solutions",
-        "categories": ["organic_food"],
-        "location": "Cairo",
-        "vendor_type": "Composting / Organic Waste"
+        "name": "Glass Recycling Center",
+        "categories": ["glass"],
+        "location": "Maadi",
+        "vendor_type": "Glass Recycler",
+        "offer_price": 4,
+        "pickup_available": true
     },
     {
         "id": 6,
+        "name": "Organic Waste Solutions",
+        "categories": ["organic_food"],
+        "location": "Cairo",
+        "vendor_type": "Composting / Organic Waste",
+        "offer_price": 2,
+        "pickup_available": true
+    },
+    {
+        "id": 7,
         "name": "Certified E-Waste Egypt",
         "categories": ["e_waste"],
         "location": "Cairo",
-        "vendor_type": "E-Waste Recycler"
+        "vendor_type": "E-Waste Recycler",
+        "offer_price": 20,
+        "pickup_available": false
     }
 ]
