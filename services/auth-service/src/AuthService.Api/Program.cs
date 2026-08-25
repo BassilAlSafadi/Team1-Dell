@@ -31,6 +31,7 @@ builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddScoped<IEmailVerificationService, EmailVerificationService>();
 builder.Services.AddScoped<IPasswordResetService, PasswordResetService>();
+builder.Services.AddScoped<IReviewService, ReviewService>();
 
 var jwtSection = builder.Configuration.GetSection(JwtOptions.SectionName);
 builder.Services

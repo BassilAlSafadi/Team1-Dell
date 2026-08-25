@@ -15,4 +15,6 @@ public class User
     public List<AuthIdentity> AuthIdentities { get; set; } = new();
     public List<Session> Sessions { get; set; } = new();
     public List<UserRole> UserRoles { get; set; } = new();
+    public List<Review> ReviewsReceived { get; set; } = new();
+    public List<Review> ReviewsWritten { get; set; } = new();
 }
