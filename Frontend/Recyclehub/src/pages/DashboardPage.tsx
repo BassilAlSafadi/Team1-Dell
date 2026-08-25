@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import ChatbotWidget from '../components/ChatbotWidget'
 import './DashboardPage.css'
 
 const navLinks = [
@@ -258,6 +259,8 @@ function DashboardPage() {
           </div>
         </section>
       </main>
+
+      <ChatbotWidget />
     </div>
   )
 }
