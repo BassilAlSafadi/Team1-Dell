@@ -69,11 +69,14 @@
   }
 }
 
+.nav-actions {
+  display: flex;
+}
+
 .get-started-btn {
   border: none;
   cursor: pointer;
   padding: 12px 28px;
-  border-radius: 999px;
   background: var(--green);
   color: #fff;
   font-size: 16px;
@@ -87,6 +90,15 @@
   &:focus-visible {
     outline: 2px solid var(--green-dark);
     outline-offset: 2px;
+    z-index: 1;
+  }
+
+  &:first-child {
+    border-radius: 999px 0 0 999px;
+  }
+  &:last-child {
+    border-radius: 0 999px 999px 0;
+    border-left: 1px solid rgba(255, 255, 255, 0.35);
   }
 }
 
