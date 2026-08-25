@@ -854,4 +854,3 @@ if __name__ == "__main__":
             analysis,
             trend_analysis
         )
-```
