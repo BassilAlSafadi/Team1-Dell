@@ -177,15 +177,81 @@ function RegisterPage() {
 
             <div className="register-form-panel">
               <form className="register-form">
-                <label htmlFor="fullName">Full name:</label>
-                <input id="fullName" name="fullName" type="text" autoComplete="name" />
+                
 
-                <label htmlFor="orgName">
-                  {selectedRole.id === 'vendor'
-                    ? 'Vendor / shop name:'
-                    : 'Company name:'}
-                </label>
-                <input id="orgName" name="orgName" type="text" />
+                {selectedRole.id === 'vendor' ? (
+                  <>
+                    <label htmlFor="vendorName"> Vendor Name:</label>
+                    <input id="vendorName" name="vendorName" type="text" />
+
+                    <label htmlFor="category">Category:</label>
+                    <select id="category" name="category" defaultValue="">
+                      <option value="" disabled>
+                        Select a category
+                      </option>
+                      <option value="plastic">Plastic</option>
+                      <option value="metal">Metal</option>
+                      <option value="paper">Paper &amp; cardboard</option>
+                      <option value="glass">Glass</option>
+                      <option value="electronics">Electronics</option>
+                      <option value="organic">Organic</option>
+                      <option value="mixed">Mixed / other</option>
+                    </select>
+
+                    <label htmlFor="taxCertificate">
+                      Tax card / certification (for verification):
+                    </label>
+                    <input
+                      id="taxCertificate"
+                      name="taxCertificate"
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                    />
+
+                    <label htmlFor="fulfillment">Drop off or delivery:</label>
+                    <select id="fulfillment" name="fulfillment" defaultValue="">
+                      <option value="" disabled>
+                        Select an option
+                      </option>
+                      <option value="pickup">Drop off</option>
+                      <option value="delivery">Delivery</option>
+                      <option value="both">Both</option>
+                    </select>
+
+                    <label htmlFor="operatingHours">Operating hours:</label>
+                    <input
+                      id="operatingHours"
+                      name="operatingHours"
+                      type="text"
+                      placeholder="e.g. Mon–Fri, 9am–5pm"
+                    />
+
+                    <label htmlFor="location">Location (address):</label>
+                    <input
+                      id="location"
+                      name="location"
+                      type="text"
+                      autoComplete="street-address"
+                    />
+
+                    <label htmlFor="minimumAmount">
+                      Minimum amount required:
+                    </label>
+                    <input
+                      id="minimumAmount"
+                      name="minimumAmount"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="e.g. 10"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <label htmlFor="orgName">Company name:</label>
+                    <input id="orgName" name="orgName" type="text" />
+                  </>
+                )}
 
                 <label htmlFor="email">Email:</label>
                 <input id="email" name="email" type="email" autoComplete="email" />
