@@ -14,3 +14,7 @@ __pycache__/
 services/ai-service/data/source_pdfs/*.pdf
 services/ai-service/data/ocr_cache/
 services/ai-service/data/vector_store/
+
+# Node.js
+node_modules/
+npm-debug.log*
