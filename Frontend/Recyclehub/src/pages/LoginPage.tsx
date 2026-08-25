@@ -80,7 +80,7 @@ function LoginPage() {
             </form>
 
             <p className="signup-hint">
-              Don&apos;t have an account? <Link to="/">Register</Link>
+              Don&apos;t have an account? <Link to="/register">Register</Link>
             </p>
           </div>
         </div>

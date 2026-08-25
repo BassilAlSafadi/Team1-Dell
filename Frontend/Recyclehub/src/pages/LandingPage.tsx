@@ -76,9 +76,9 @@ function LandingPage() {
         </nav>
 
         <div className="nav-actions">
-          <button type="button" className="get-started-btn">
+          <Link to="/register" className="get-started-btn">
             Register
-          </button>
+          </Link>
           <Link to="/login" className="get-started-btn">
             Log In
           </Link>
