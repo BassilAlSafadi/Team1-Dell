@@ -1,0 +1,115 @@
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 26, 19, 0.45);
+  padding: 20px;
+}
+
+.modal-card {
+  width: 100%;
+  max-width: 420px;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  padding: 28px;
+  box-sizing: border-box;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-header h2 {
+  font-size: 20px;
+}
+
+.modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: color 0.2s;
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  &:hover {
+    color: var(--green-dark);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--green-dark);
+    outline-offset: 2px;
+  }
+}
+
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  margin-top: 20px;
+}
+
+.modal-form label {
+  margin-top: 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.modal-form label:first-child {
+  margin-top: 0;
+}
+
+.modal-form input,
+.modal-form select,
+.modal-form textarea {
+  margin-top: 8px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-size: 15px;
+  color: var(--text-h);
+  font-family: inherit;
+  resize: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+
+  &:focus {
+    outline: none;
+    border-color: var(--green);
+    box-shadow: 0 0 0 3px var(--green-light);
+  }
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.modal-success {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+
+  p {
+    color: var(--text-h);
+    font-size: 15px;
+  }
+}

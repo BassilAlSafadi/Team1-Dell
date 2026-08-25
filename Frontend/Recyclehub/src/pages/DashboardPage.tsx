@@ -1,14 +1,9 @@
-import { Link } from 'react-router-dom'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
+import { Link, useLocation } from 'react-router-dom'
+import Navbar from '../components/Navbar'
 import ChatbotWidget from '../components/ChatbotWidget'
+import AddWasteModal from '../components/AddWasteModal'
 import './DashboardPage.css'
-
-const navLinks = [
-  { label: 'Home', href: '#home' },
-  { label: 'My Waste', href: '#my-waste' },
-  { label: 'Find Vendors', href: '#find-vendors' },
-  { label: 'Transactions', href: '#transactions' },
-  { label: 'Impact', href: '#impact' },
-]
 
 const stats = [
   {
@@ -95,60 +90,31 @@ const impact = [
 const maxImpact = Math.max(...impact.map((m) => m.kg))
 
 function DashboardPage() {
+  const location = useLocation()
+  const scannerRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (location.hash) {
+      document.getElementById(location.hash.slice(1))?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [location.hash])
+
+  const handleScanWaste = () => {
+    scannerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const handleImageSelected = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setPreviewImage(URL.createObjectURL(file))
+  }
+
   return (
     <div className="page dashboard-page">
-      <header className="navbar">
-        <div className="brand">
-          <span className="logo" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M12 3c2.5 2 4 4.5 4 7.5a4 4 0 1 1-8 0C8 7.5 9.5 5 12 3Z"
-                fill="currentColor"
-              />
-              <path
-                d="M12 12v9M8 21h8"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-              />
-            </svg>
-          </span>
-          <span className="brand-name">RecycleHub</span>
-        </div>
-
-        <nav className="nav-links">
-          {navLinks.map((link) => (
-            <a href={link.href} key={link.label}>
-              {link.label}
-            </a>
-          ))}
-        </nav>
-
-        <div className="dashboard-nav-actions">
-          <button type="button" className="icon-btn" aria-label="Notifications">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M18 16v-5a6 6 0 1 0-12 0v5l-2 3h16l-2-3Z"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M9.5 20a2.5 2.5 0 0 0 5 0"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
-
-          <span className="user-avatar" aria-hidden="true">U</span>
-
-          <Link to="/login" className="logout-link">
-            Logout
-          </Link>
-        </div>
-      </header>
+      <Navbar />
 
       <main className="dashboard-main">
         <section className="welcome">
@@ -159,10 +125,14 @@ function DashboardPage() {
           </p>
 
           <div className="welcome-actions">
-            <button type="button" className="btn-primary">
+            <button type="button" className="btn-primary" onClick={handleScanWaste}>
               Scan Waste
             </button>
-            <button type="button" className="btn-secondary">
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => setIsAddModalOpen(true)}
+            >
               Add Waste Manually
             </button>
           </div>
@@ -185,29 +155,33 @@ function DashboardPage() {
         </section>
 
         <section className="dashboard-grid">
-          <div className="panel scanner-panel">
+          <div className="panel scanner-panel" id="scanner" ref={scannerRef}>
             <h2>AI Waste Scanner</h2>
 
             <div className="dropzone">
-              <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect
-                  x="6"
-                  y="10"
-                  width="36"
-                  height="28"
-                  rx="4"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                />
-                <circle cx="17" cy="20" r="3.5" stroke="currentColor" strokeWidth="2" />
-                <path
-                  d="M6 32l10-10 7 7 6-6 13 13"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              {previewImage ? (
+                <img src={previewImage} alt="Selected waste" className="dropzone-preview" />
+              ) : (
+                <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect
+                    x="6"
+                    y="10"
+                    width="36"
+                    height="28"
+                    rx="4"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  />
+                  <circle cx="17" cy="20" r="3.5" stroke="currentColor" strokeWidth="2" />
+                  <path
+                    d="M6 32l10-10 7 7 6-6 13 13"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
             </div>
 
             <p className="scanner-hint">
@@ -215,8 +189,19 @@ function DashboardPage() {
               recyclability score, and estimated market value instantly.
             </p>
 
-            <button type="button" className="btn-secondary">
-              Upload Image
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="visually-hidden"
+              onChange={handleImageSelected}
+            />
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {previewImage ? 'Replace Image' : 'Upload Image'}
             </button>
           </div>
 
@@ -235,9 +220,9 @@ function DashboardPage() {
               ))}
             </ul>
 
-            <a href="#transactions" className="view-all-link">
+            <Link to="/transactions" className="view-all-link">
               View All Transactions →
-            </a>
+            </Link>
           </div>
         </section>
 
@@ -259,6 +244,8 @@ function DashboardPage() {
           </div>
         </section>
       </main>
+
+      {isAddModalOpen && <AddWasteModal onClose={() => setIsAddModalOpen(false)} />}
 
       <ChatbotWidget />
     </div>
