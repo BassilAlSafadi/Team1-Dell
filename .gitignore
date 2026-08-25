@@ -18,3 +18,7 @@ services/ai-service/data/vector_store/
 # Node.js
 node_modules/
 npm-debug.log*
+
+# Go
+services/notification-service/notification-service
+services/notification-service/*.exe
