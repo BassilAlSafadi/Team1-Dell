@@ -1,0 +1,61 @@
+.vendor-transactions-panel {
+  padding: 0;
+  overflow-x: auto;
+}
+
+.vendor-transactions-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 640px;
+}
+
+.vendor-transactions-table th {
+  text-align: left;
+  padding: 18px 24px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+}
+
+.vendor-transactions-table td {
+  padding: 16px 24px;
+  font-size: 15px;
+  color: var(--text-h);
+  border-bottom: 1px solid var(--border);
+}
+
+.vendor-transactions-table tr:last-child td {
+  border-bottom: none;
+}
+
+.amount-positive {
+  color: var(--green-dark);
+  font-weight: 700;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.status-completed {
+  background: var(--green-light);
+  color: var(--green-dark);
+}
+
+.status-pending {
+  background: #fdf3e2;
+  color: #96660c;
+}
+
+.status-cancelled {
+  background: #fbeae9;
+  color: #a3312c;
+}

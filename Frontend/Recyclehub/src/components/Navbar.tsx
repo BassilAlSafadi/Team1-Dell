@@ -2,22 +2,43 @@ import { useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import './Navbar.css'
 
-const navLinks = [
-  { label: 'Home', to: '/dashboard' },
-  { label: 'My Waste', to: '/my-waste' },
-  { label: 'Find Vendors', to: '/find-vendors' },
-  { label: 'Transactions', to: '/transactions' },
-  { label: 'Impact', to: '/dashboard#impact' },
-]
+type NavbarVariant = 'business' | 'vendor'
 
-const notifications = [
-  { id: 1, text: 'Your plastic sale (45 EGP) was confirmed.', time: '2h ago' },
-  { id: 2, text: 'GreenLoop Vendor accepted your offer.', time: '1d ago' },
-  { id: 3, text: 'AI scan complete: Glass Bottle, high value.', time: '2d ago' },
-]
+const navLinksByVariant: Record<NavbarVariant, { label: string; to: string }[]> = {
+  business: [
+    { label: 'Home', to: '/dashboard' },
+    { label: 'My Waste', to: '/my-waste' },
+    { label: 'Find Vendors', to: '/find-vendors' },
+    { label: 'Transactions', to: '/transactions' },
+    { label: 'Impact', to: '/dashboard#impact' },
+  ],
+  vendor: [
+    { label: 'Home', to: '/vendor-dashboard' },
+    { label: 'Find Requests', to: '/vendor-requests' },
+    { label: 'Transactions', to: '/vendor-transactions' },
+    { label: 'Profile', to: '/vendor-dashboard#profile' },
+  ],
+}
 
-function Navbar() {
+const notificationsByVariant: Record<NavbarVariant, { id: number; text: string; time: string }[]> = {
+  business: [
+    { id: 1, text: 'Your plastic sale (45 EGP) was confirmed.', time: '2h ago' },
+    { id: 2, text: 'GreenLoop Vendor accepted your offer.', time: '1d ago' },
+    { id: 3, text: 'AI scan complete: Glass Bottle, high value.', time: '2d ago' },
+  ],
+  vendor: [
+    { id: 1, text: 'New pickup request from GreenMart Supermarket.', time: '2h ago' },
+    { id: 2, text: 'Cafe Nour rated your last pickup 5 stars.', time: '1d ago' },
+    { id: 3, text: 'Payment of 220 EGP received.', time: '2d ago' },
+  ],
+}
+
+function Navbar({ variant = 'business' }: { variant?: NavbarVariant }) {
   const [openMenu, setOpenMenu] = useState<'notifications' | 'account' | null>(null)
+  const navLinks = navLinksByVariant[variant]
+  const notifications = notificationsByVariant[variant]
+  const homeTo = variant === 'vendor' ? '/vendor-dashboard' : '/dashboard'
+  const accountLabel = variant === 'vendor' ? '[Vendor Name]' : '[Business Name]'
 
   const toggleMenu = (menu: 'notifications' | 'account') => {
     setOpenMenu((current) => (current === menu ? null : menu))
@@ -25,7 +46,7 @@ function Navbar() {
 
   return (
     <header className="navbar">
-      <Link to="/dashboard" className="brand">
+      <Link to={homeTo} className="brand">
         <span className="logo" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path
@@ -113,7 +134,7 @@ function Navbar() {
 
           {openMenu === 'account' && (
             <div className="dropdown account-dropdown">
-              <p className="dropdown-title">[Business Name]</p>
+              <p className="dropdown-title">{accountLabel}</p>
               <Link to="/login" className="dropdown-link">
                 Logout
               </Link>

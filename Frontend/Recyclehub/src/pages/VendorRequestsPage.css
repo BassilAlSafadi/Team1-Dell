@@ -1,0 +1,87 @@
+.request-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 980px) {
+  .request-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .request-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.request-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 24px;
+}
+
+.request-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.request-card-top h2 {
+  font-size: 18px;
+}
+
+.request-fulfillment {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--green-light);
+  color: var(--green-dark);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.request-location {
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.request-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.request-tag {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid var(--border);
+  color: var(--text-h);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.request-quantity {
+  margin-top: 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.request-posted {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.request-card .btn-primary {
+  margin-top: 20px;
+  align-self: flex-start;
+}

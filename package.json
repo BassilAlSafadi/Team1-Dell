@@ -1,12 +1,10 @@
 {
   "name": "team1-dell",
-  "version": "1.0.0",
-  "main": "index.js",
+  "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": ""
+    "dev": "npm --prefix Frontend/Recyclehub run dev",
+    "build": "npm --prefix Frontend/Recyclehub run build",
+    "lint": "npm --prefix Frontend/Recyclehub run lint",
+    "preview": "npm --prefix Frontend/Recyclehub run preview"
+  }
 }
