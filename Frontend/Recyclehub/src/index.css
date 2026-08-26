@@ -1,0 +1,157 @@
+:root {
+  --text: #445048;
+  --text-h: #0f1a13;
+  --bg: #ffffff;
+  --border: #dfe7e1;
+
+  --green: #1fa14a;
+  --green-dark: #16803a;
+  --green-light: #eaf7ee;
+  --surface: #f3faf5;
+
+  --shadow:
+    rgba(15, 26, 19, 0.08) 0 10px 25px -5px, rgba(15, 26, 19, 0.05) 0 4px 6px -2px;
+
+  --page-max: 1440px;
+
+  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+
+  font: 18px/145% var(--sans);
+  letter-spacing: 0.18px;
+  color-scheme: light;
+  color: var(--text);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  @media (max-width: 1024px) {
+    font-size: 16px;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+#root {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+h1,
+h2 {
+  font-family: var(--sans);
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0;
+}
+
+p {
+  margin: 0;
+}
+
+button {
+  font-family: var(--sans);
+}
+
+.btn-primary {
+  border: none;
+  cursor: pointer;
+  padding: 12px 28px;
+  border-radius: 999px;
+  background: var(--green);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: inherit;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+
+.btn-primary:hover {
+  background: var(--green-dark);
+  box-shadow: var(--shadow);
+}
+
+.btn-primary:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.btn-secondary {
+  border: 1px solid var(--border);
+  cursor: pointer;
+  padding: 12px 28px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--text-h);
+  font-size: 16px;
+  font-weight: 600;
+  font-family: inherit;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.btn-secondary:hover {
+  border-color: var(--green);
+  color: var(--green-dark);
+}
+
+.btn-secondary:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.panel {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 32px;
+}
+
+@media (max-width: 768px) {
+  .panel {
+    padding: 24px;
+  }
+}
+
+.app-main {
+  width: 100%;
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 40px 48px 96px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .app-main {
+    padding: 24px 20px 64px;
+  }
+}
+
+.page-header {
+  margin-bottom: 32px;
+}
+
+.page-header h1 {
+  font-size: 30px;
+  letter-spacing: -0.5px;
+}
+
+.page-header p {
+  margin-top: 8px;
+  color: var(--text);
+  font-size: 16px;
+}
+
+.page-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}

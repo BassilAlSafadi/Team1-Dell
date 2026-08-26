@@ -1,0 +1,10 @@
+{
+  "name": "team1-dell",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix Frontend/Recyclehub run dev",
+    "build": "npm --prefix Frontend/Recyclehub run build",
+    "lint": "npm --prefix Frontend/Recyclehub run lint",
+    "preview": "npm --prefix Frontend/Recyclehub run preview"
+  }
+}
