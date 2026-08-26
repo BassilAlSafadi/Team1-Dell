@@ -136,10 +136,8 @@ function TransactionsPage() {
       setLoading(true)
       setError(null)
 
-      let corporateId: string
       try {
-        const profile = await api.get<CorporateProfileResponse>('/api/corporate-profiles/mine')
-        corporateId = profile.corporateId
+        await api.get<CorporateProfileResponse>('/api/corporate-profiles/mine')
       } catch (err) {
         if (err instanceof ApiError && err.status === 404) {
           if (!cancelled) {

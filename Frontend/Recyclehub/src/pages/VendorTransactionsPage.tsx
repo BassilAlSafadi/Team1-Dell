@@ -138,10 +138,8 @@ function VendorTransactionsPage() {
       setLoading(true)
       setError(null)
 
-      let vendorId: string
       try {
-        const profile = await api.get<VendorProfileResponse>('/api/vendor-profiles/mine')
-        vendorId = profile.vendorId
+        await api.get<VendorProfileResponse>('/api/vendor-profiles/mine')
       } catch (err) {
         if (err instanceof ApiError && err.status === 404) {
           if (!cancelled) {
