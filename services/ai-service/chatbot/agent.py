@@ -32,10 +32,10 @@ If the user asks for anything about how to break a law or avoid a legal obligati
 _TOOLS_BY_NAME = {t.name: t for t in ALL_TOOLS}
 
 
-def build_llm() -> ChatGoogleGenerativeAI:
+def build_llm(model: str | None = None, api_key: str | None = None) -> ChatGoogleGenerativeAI:
     llm = ChatGoogleGenerativeAI(
-        model=config.GEMINI_CHAT_MODEL,
-        api_key=config.GEMINI_API_KEY,
+        model=model or config.MODEL_FALLBACK_CHAIN[0],
+        api_key=api_key or config.GEMINI_API_KEY,
         temperature=0.3,
     )
     return llm.bind_tools(ALL_TOOLS)

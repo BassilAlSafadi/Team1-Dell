@@ -1,0 +1,18 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 199/199 [00:00<00:00, 4289.78it/s]
+Traceback (most recent call last):
+  File "F:\basil\Internships\Dell\Project\Team1-Dell\services\ai-service\grpc_server.py", line 179, in <module>
+    asyncio.run(serve())
+    ~~~~~~~~~~~^^^^^^^^^
+  File "C:\Program Files\Python313\Lib\asyncio\runners.py", line 195, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "C:\Program Files\Python313\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Program Files\Python313\Lib\asyncio\base_events.py", line 725, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "F:\basil\Internships\Dell\Project\Team1-Dell\services\ai-service\grpc_server.py", line 166, in serve
+    await health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)
+TypeError: object NoneType can't be used in 'await' expression

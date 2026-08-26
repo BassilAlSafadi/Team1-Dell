@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package notification.v1;
+
+option go_package = "notification-service/internal/grpcgen/notification/v1;notificationv1";
+
+import "google/protobuf/timestamp.proto";
+
+// CreateNotification is the gRPC entry point for the write path notification-service's own
+// REST handler comment already calls out as the natural home for domain events (MessageSent,
+// CommentCreated, OfferAccepted, etc.). Real callers: transaction-service, messaging-service,
+// auth-service, ai-service.
+service NotificationService {
+  rpc CreateNotification(CreateNotificationRequest) returns (CreateNotificationResponse);
+}
+
+message EntityRef {
+  string type = 1;
+  string id = 2;
+}
+
+message CreateNotificationRequest {
+  // Recipient — an auth-service user id in the general case (see caveat on the
+  // transaction-service deal-transition caller: buyer_id/seller_id there are
+  // Marketplace-service account ids, a different id space, until marketplace-service exists).
+  string user_id = 1;
+  string type = 2;
+  string title = 3;
+  string body = 4;
+  optional string actor_id = 5;
+  EntityRef entity = 6;
+}
+
+message CreateNotificationResponse {
+  string notification_id = 1;
+  string user_id = 2;
+  string type = 3;
+  string title = 4;
+  string body = 5;
+  optional string actor_id = 6;
+  EntityRef entity = 7;
+  bool is_read = 8;
+  google.protobuf.Timestamp created_at = 9;
+}

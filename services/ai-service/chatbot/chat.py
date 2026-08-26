@@ -14,6 +14,7 @@ logging.getLogger("google_genai.models").setLevel(logging.ERROR)
 from chatbot import config
 from chatbot.agent import build_llm, new_conversation, run_turn
 from db.repository import add_message, create_thread
+from gemini_keys import call_with_gemini_fallback
 from identity import DEMO_USER_ID
 
 
@@ -26,7 +27,6 @@ def main() -> None:
         )
         sys.exit(1)
 
-    llm = build_llm()
     messages = new_conversation()
     thread_id = create_thread(DEMO_USER_ID)
 
@@ -49,14 +49,28 @@ def main() -> None:
         messages.append(HumanMessage(content=user_input))
         add_message(thread_id, "human", user_input)
 
+        checkpoint = len(messages)
         print("\nAssistant: ", end="", flush=True)
         response_chunks: list[str] = []
+
+        def attempt(model: str, api_key: str):
+            # A retry starts from a clean history — drop whatever the previous, failed
+            # attempt partially appended (a tool-call message, a partial stream, etc.).
+            del messages[checkpoint:]
+            response_chunks.clear()
+            turn_llm = build_llm(model=model, api_key=api_key)
+            return run_turn(messages, turn_llm, on_chunk=on_chunk)
 
         def on_chunk(text: str) -> None:
             print(text, end="", flush=True)
             response_chunks.append(text)
 
-        run_turn(messages, llm, on_chunk=on_chunk)
+        try:
+            call_with_gemini_fallback(attempt)
+        except Exception as exc:
+            print(f"\n❌ Gemini request failed on every configured model/key: {exc}\n")
+            continue
+
         print("\n")
 
         add_message(thread_id, "ai", "".join(response_chunks))

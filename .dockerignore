@@ -1,0 +1,41 @@
+# Applies to every service built with a repo-root context (auth-service, transaction-service,
+# messaging-service — all need /proto available to their build/runtime). Each Dockerfile still
+# COPYs only the specific paths it needs, but without this file the *entire* repo — including
+# every service's real .env, .git history, and build artifacts — would be uploaded to the
+# Docker daemon as build context.
+
+.git/
+.github/
+
+# Secrets — every service's real .env, never the committed .env.example templates.
+**/.env
+**/.env.*
+!**/.env.example
+
+# .NET build output
+**/bin/
+**/obj/
+**/.vs/
+*.user
+
+# Node.js
+**/node_modules/
+npm-debug.log*
+
+# Go
+services/notification-service/notification-service
+services/notification-service/*.exe
+
+# Python
+**/__pycache__/
+*.pyc
+**/.venv/
+services/ai-service/.pytest_cache/
+services/ai-service/.ruff_cache/
+
+# ai-service RAG data: regenerable/large, not needed by any Docker build.
+services/ai-service/data/
+
+# Editor/misc
+.vscode/
+.idea/

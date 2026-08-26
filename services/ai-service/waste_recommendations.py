@@ -1,4 +1,3 @@
-import os
 from collections import Counter, defaultdict
 from datetime import datetime
 
@@ -7,6 +6,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 from db.repository import list_classifications_for_user, save_recommendation
 from db.schemas import RecommendationRecord
+from gemini_keys import call_with_gemini_fallback
 from identity import DEMO_USER_ID
 
 # ============================================================
@@ -14,13 +14,6 @@ from identity import DEMO_USER_ID
 # ============================================================
 
 load_dotenv()
-
-API_KEY = os.getenv("GEMINI_API_KEY")
-
-if not API_KEY:
-    raise ValueError("GEMINI_API_KEY not found in .env")
-
-MODEL_NAME = "gemini-3.6-flash"
 
 
 # ============================================================
@@ -692,24 +685,28 @@ RECOMMENDED ACTIONS:
 
 
     # ========================================================
-    # CALL GEMINI
+    # CALL GEMINI — tries every (model, key) combination in MODEL_FALLBACK_CHAIN x
+    # configured keys via call_with_gemini_fallback() before giving up.
     # ========================================================
+
+    def _call_gemini(model: str, api_key: str):
+        print(f"  🔮 Generating recommendation with model={model}...")
+        llm = ChatGoogleGenerativeAI(
+            model=model,
+            temperature=0.2,
+            google_api_key=api_key,
+            max_retries=3,
+        )
+        return llm.invoke(prompt)
 
     try:
 
-        llm = ChatGoogleGenerativeAI(
-            model=MODEL_NAME,
-            temperature=0.2,
-            google_api_key=API_KEY,
-            max_retries=3,
-        )
-
-        response = llm.invoke(prompt)
+        response = call_with_gemini_fallback(_call_gemini)
 
 
-        # ====================================================
+        # ============================================================
         # FIX response.content LIST ERROR
-        # ====================================================
+        # ============================================================
 
         recommendation = response_to_text(
             response

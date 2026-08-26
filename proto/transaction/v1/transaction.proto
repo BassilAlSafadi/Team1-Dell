@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package transaction.v1;
+
+option go_package = "notification-service/internal/grpcgen/transaction/v1;transactionv1";
+
+import "google/protobuf/timestamp.proto";
+
+// Thin 1:1 mirrors of already-tested REST behavior (DealsController.Get, WalletsController.GetMine).
+// Exposed for future gRPC consumers; no caller wires this yet in this pass.
+service TransactionService {
+  rpc GetDeal(GetDealRequest) returns (DealResponse);
+  rpc GetWallet(GetWalletRequest) returns (WalletResponse);
+}
+
+message GetDealRequest {
+  string deal_id = 1;
+}
+
+message DealResponse {
+  string deal_id = 1;
+  string offer_id = 2;
+  string listing_id = 3;
+  string buyer_id = 4;
+  string seller_id = 5;
+  // Decimal amount transported as a string to avoid float precision loss.
+  string agreed_amount = 6;
+  string currency = 7;
+  string status = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp completed_at = 10;
+  google.protobuf.Timestamp cancelled_at = 11;
+}
+
+message GetWalletRequest {
+  string wallet_id = 1;
+}
+
+message WalletResponse {
+  string wallet_id = 1;
+  string user_id = 2;
+  // Decimal balance transported as a string to avoid float precision loss.
+  string balance = 3;
+  string currency = 4;
+  string status = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}

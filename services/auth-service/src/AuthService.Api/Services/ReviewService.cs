@@ -1,6 +1,9 @@
 using System.Net;
+using System.Text.Json;
 using AuthService.Api.Contracts;
+using AuthService.Api.Grpc;
 using AuthService.Domain.Entities;
+using AuthService.Infrastructure.Caching;
 using AuthService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,12 +13,17 @@ public class ReviewService : IReviewService
 {
     private const string VendorRoleName = "VENDOR";
     private const int MaxPageSize = 50;
+    private static readonly TimeSpan VendorProfileCacheTtl = TimeSpan.FromMinutes(5);
 
     private readonly AuthDbContext _db;
+    private readonly INotificationPublisher _notifications;
+    private readonly IRedisCache _cache;
 
-    public ReviewService(AuthDbContext db)
+    public ReviewService(AuthDbContext db, INotificationPublisher notifications, IRedisCache cache)
     {
         _db = db;
+        _notifications = notifications;
+        _cache = cache;
     }
 
     public async Task<ReviewResponse> UpsertReviewAsync(Guid vendorId, Guid reviewerId, short rating, string? comment, CancellationToken ct)
@@ -59,6 +67,18 @@ public class ReviewService : IReviewService
 
         await _db.SaveChangesAsync(ct);
 
+        // Real gRPC domain call, per the mesh plan: notify the vendor over gRPC of a new/updated
+        // review. Best-effort — notification-service being down must never fail a review write.
+        await _notifications.PublishAsync(
+            userId: vendorId.ToString(),
+            type: "NEW_REVIEW",
+            title: "New review received",
+            body: $"You received a {rating}-star review.",
+            actorId: reviewerId.ToString(),
+            entityType: "review",
+            entityId: review.ReviewId.ToString(),
+            ct: ct);
+
         return ToResponse(review);
     }
 
@@ -73,10 +93,27 @@ public class ReviewService : IReviewService
 
     public async Task<VendorProfileResponse> GetVendorProfileAsync(Guid vendorId, CancellationToken ct)
     {
+        // Pure TTL-expiry cache-aside, no write-invalidation — read-heavy, slow-changing
+        // aggregate; a 5-minute staleness window on a rating average is acceptable (see
+        // REDIS_INTEGRATION_PLAN.md §2).
+        var cacheKey = $"cache:auth:vendor-profile:{vendorId}";
+        var cached = await _cache.GetStringAsync(cacheKey);
+        if (cached is not null)
+        {
+            var cachedProfile = JsonSerializer.Deserialize<VendorProfileResponse>(cached);
+            if (cachedProfile is not null)
+            {
+                return cachedProfile;
+            }
+        }
+
         var vendor = await EnsureVendorExistsAsync(vendorId, ct);
         var (averageRating, reviewCount) = await GetRatingStatsAsync(vendorId, ct);
+        var profile = new VendorProfileResponse(vendor.UserId, vendor.Email, vendor.Status, averageRating, reviewCount);
 
-        return new VendorProfileResponse(vendor.UserId, vendor.Email, vendor.Status, averageRating, reviewCount);
+        await _cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(profile), VendorProfileCacheTtl);
+
+        return profile;
     }
 
     public async Task<VendorReviewsResponse> GetVendorReviewsAsync(Guid vendorId, int page, int pageSize, CancellationToken ct)

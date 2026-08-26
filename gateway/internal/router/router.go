@@ -1,0 +1,131 @@
+// Package router builds the gateway's route table (plan §4.1). Each backend gets a
+// REST-reverse-proxy mount as the fallback, with specific routes overridden to call the real
+// gRPC RPC where one already exists — chi's radix-tree routing naturally prefers a literal
+// route match over a wildcard mount, so registering both for the same prefix is enough for the
+// literal one to win.
+package router
+
+import (
+	"net/http"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
+
+	"gateway/internal/config"
+	"gateway/internal/grpcclients"
+	"gateway/internal/handlers"
+	"gateway/internal/health"
+	appmw "gateway/internal/middleware"
+	"gateway/internal/proxy"
+	"gateway/internal/ratelimit"
+)
+
+func New(cfg *config.Config, clients *grpcclients.Clients, limiter ratelimit.Limiter) (http.Handler, error) {
+	checker := health.NewChecker(map[string]string{
+		"auth-service":         cfg.AuthGRPCAddr,
+		"transaction-service":  cfg.TransactionGRPCAddr,
+		"messaging-service":    cfg.MessagingGRPCAddr,
+		"notification-service": cfg.NotificationGRPCAddr,
+		"ai-service":           cfg.AiGRPCAddr,
+	}, 5*time.Second)
+
+	authProxy, err := proxy.New(cfg.AuthRESTAddr, "auth-service", checker)
+	if err != nil {
+		return nil, err
+	}
+	transactionProxy, err := proxy.New(cfg.TransactionRESTAddr, "transaction-service", checker)
+	if err != nil {
+		return nil, err
+	}
+	messagingProxy, err := proxy.New(cfg.MessagingRESTAddr, "messaging-service", checker)
+	if err != nil {
+		return nil, err
+	}
+	notificationProxy, err := proxy.New(cfg.NotificationRESTAddr, "notification-service", checker)
+	if err != nil {
+		return nil, err
+	}
+
+	r := chi.NewRouter()
+	r.Use(chimiddleware.RequestID)
+	r.Use(chimiddleware.RealIP)
+	r.Use(chimiddleware.Logger)
+	r.Use(chimiddleware.Recoverer)
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   corsOrigins(cfg.CORSOrigins),
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
+		AllowedHeaders:   []string{"Authorization", "Content-Type"},
+		AllowCredentials: true,
+	}))
+	r.Use(appmw.RateLimit(limiter))
+
+	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
+
+	// messaging-service's realtime traffic bypasses gRPC entirely (decision (b)) — Socket.io
+	// does its own handshake auth, so this isn't gated behind RequireAuth at the HTTP layer.
+	r.Handle("/socket.io/*", messagingProxy)
+
+	auth := appmw.OptionalAuth(cfg)
+	requireAuth := appmw.RequireAuth(cfg)
+
+	// --- auth-service ---
+	r.Group(func(r chi.Router) {
+		r.Use(auth)
+		// Public: register/login/google/refresh/logout, email-verification, password-reset,
+		// and the public vendor profile/reviews reads.
+		r.Get("/api/vendors/{vendorId}/profile", handlers.VendorProfile(clients.Auth))
+
+		r.With(requireAuth).Get("/api/auth/me", handlers.Me(clients.Auth))
+		r.With(requireAuth).Put("/api/vendors/{vendorId}/reviews", authProxy.ServeHTTP)
+		r.With(requireAuth).Delete("/api/vendors/{vendorId}/reviews", authProxy.ServeHTTP)
+
+		r.Handle("/api/auth/*", authProxy)
+		r.Handle("/api/vendors/*", authProxy) // reviews GET (list) falls through here
+	})
+
+	// --- transaction-service ---
+	r.Group(func(r chi.Router) {
+		r.Use(requireAuth) // every transaction-service route requires auth today
+		r.Get("/api/deals/{dealId}", handlers.Deal(clients.Transaction))
+		r.Handle("/api/wallets/*", transactionProxy)
+		r.Handle("/api/payment-methods/*", transactionProxy)
+		r.Handle("/api/offers/*", transactionProxy)
+		r.Handle("/api/deals/*", transactionProxy)
+	})
+
+	// --- messaging-service ---
+	r.Group(func(r chi.Router) {
+		r.Use(requireAuth)
+		r.Get("/api/conversations/{conversationId}", handlers.Conversation(clients.Messaging))
+		r.Handle("/api/conversations/*", messagingProxy)
+		r.Handle("/api/messages/*", messagingProxy)
+	})
+
+	// --- notification-service (no gRPC read RPC exposed to end users yet — CreateNotification
+	// is the internal mesh's write path other backend services call, not a user-facing route) ---
+	r.Group(func(r chi.Router) {
+		r.Use(requireAuth)
+		r.Handle("/api/notifications/*", notificationProxy)
+	})
+
+	// --- ai-service (no REST API at all — every route is gRPC) ---
+	r.Group(func(r chi.Router) {
+		r.Use(requireAuth)
+		r.Post("/api/ai/classify", handlers.ClassifyWaste(clients.Ai))
+		r.Get("/api/ai/recommendation", handlers.Recommendation(clients.Ai))
+	})
+
+	return r, nil
+}
+
+func corsOrigins(origins []string) []string {
+	if len(origins) == 0 {
+		return []string{"*"}
+	}
+	return origins
+}

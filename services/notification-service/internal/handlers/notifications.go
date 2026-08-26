@@ -1,26 +1,31 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"notification-service/internal/middleware"
 	"notification-service/internal/models"
+	"notification-service/internal/service"
 )
 
 type NotificationHandler struct {
 	collection *mongo.Collection
+	redis      *redis.Client // nil disables caching, see internal/cache
 }
 
-func NewNotificationHandler(db *mongo.Database) *NotificationHandler {
-	return &NotificationHandler{collection: db.Collection("notifications")}
+func NewNotificationHandler(db *mongo.Database, redisClient *redis.Client) *NotificationHandler {
+	return &NotificationHandler{collection: db.Collection("notifications"), redis: redisClient}
 }
 
 type createNotificationRequest struct {
@@ -53,19 +58,15 @@ func (h *NotificationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	notification := models.Notification{
-		ID:        bson.NewObjectID(),
-		UserID:    req.UserID,
-		Type:      models.NotificationType(req.Type),
-		Title:     req.Title,
-		Body:      req.Body,
-		ActorID:   req.ActorID,
-		Entity:    req.Entity,
-		IsRead:    false,
-		CreatedAt: time.Now().UTC(),
-	}
-
-	if _, err := h.collection.InsertOne(r.Context(), notification); err != nil {
+	notification, err := service.CreateNotification(r.Context(), h.collection, h.redis, service.CreateNotificationInput{
+		UserID:  req.UserID,
+		Type:    req.Type,
+		Title:   req.Title,
+		Body:    req.Body,
+		ActorID: req.ActorID,
+		Entity:  req.Entity,
+	})
+	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to create notification.")
 		return
 	}
@@ -117,17 +118,40 @@ func (h *NotificationHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, notifications)
 }
 
-// UnreadCount powers the unread badge.
+// UnreadCount powers the unread badge. Cache-aside with a short TTL, plus
+// write-invalidation from Create/MarkRead/MarkAllRead (see REDIS_INTEGRATION_PLAN.md §2) —
+// a badge that lags the user's own action for even a few seconds is a worse bug than the
+// TTL-only staleness everything else in the mesh accepts.
 func (h *NotificationHandler) UnreadCount(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.UserID(r)
+	ctx := r.Context()
+	cacheKey := service.UnreadCountCacheKey(userID)
 
-	count, err := h.collection.CountDocuments(r.Context(), bson.D{
+	if h.redis != nil {
+		cached, err := h.redis.Get(ctx, cacheKey).Result()
+		if err == nil {
+			if count, perr := strconv.ParseInt(cached, 10, 64); perr == nil {
+				writeJSON(w, http.StatusOK, map[string]int64{"unreadCount": count})
+				return
+			}
+		} else if err != redis.Nil {
+			log.Printf("[cache] unread-count read failed, falling back to Mongo: %v", err)
+		}
+	}
+
+	count, err := h.collection.CountDocuments(ctx, bson.D{
 		{Key: "user_id", Value: userID},
 		{Key: "is_read", Value: false},
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to count unread notifications.")
 		return
+	}
+
+	if h.redis != nil {
+		if err := h.redis.Set(ctx, cacheKey, count, 10*time.Second).Err(); err != nil {
+			log.Printf("[cache] unread-count write failed: %v", err)
+		}
 	}
 
 	writeJSON(w, http.StatusOK, map[string]int64{"unreadCount": count})
@@ -161,6 +185,7 @@ func (h *NotificationHandler) MarkRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.invalidateUnreadCount(r.Context(), userID)
 	writeJSON(w, http.StatusOK, updated)
 }
 
@@ -179,7 +204,19 @@ func (h *NotificationHandler) MarkAllRead(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	h.invalidateUnreadCount(r.Context(), userID)
 	writeJSON(w, http.StatusOK, map[string]int64{"updated": result.ModifiedCount})
+}
+
+// invalidateUnreadCount is best-effort: a Redis outage must never fail a request that
+// already succeeded against Mongo.
+func (h *NotificationHandler) invalidateUnreadCount(ctx context.Context, userID string) {
+	if h.redis == nil {
+		return
+	}
+	if err := h.redis.Del(ctx, service.UnreadCountCacheKey(userID)).Err(); err != nil {
+		log.Printf("[cache] failed to invalidate unread-count cache: %v", err)
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {

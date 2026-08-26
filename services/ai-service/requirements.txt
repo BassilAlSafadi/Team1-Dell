@@ -8,3 +8,17 @@ chromadb
 pymupdf
 python-dotenv
 pymongo
+
+# gRPC server (ai-service's first long-running process) + clients to the other
+# 4 services. Pinned to grpcio 1.71.x / protobuf 5.x — newer grpcio-tools
+# (1.8x) forces protobuf>=7, which conflicts with several other deps already
+# in this environment (google-ai-generativelanguage, grpcio-status,
+# opentelemetry-proto, proto-plus all cap protobuf below 6/7).
+grpcio==1.71.2
+grpcio-tools==1.71.2
+grpcio-health-checking==1.71.2
+protobuf>=5.26.1,<6.0
+
+# Redis cache-aside layer (vendor-search results) — see REDIS_INTEGRATION_PLAN.md.
+# redis-py >=4.2 ships its own asyncio client (redis.asyncio), no separate aioredis needed.
+redis==5.0.8

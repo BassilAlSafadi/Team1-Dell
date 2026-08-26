@@ -1,6 +1,8 @@
 using System.Net;
+using System.Text.Json;
 using AuthService.Api.Contracts;
 using AuthService.Domain.Entities;
+using AuthService.Infrastructure.Caching;
 using AuthService.Infrastructure.Options;
 using AuthService.Infrastructure.Persistence;
 using AuthService.Infrastructure.Security;
@@ -12,6 +14,7 @@ namespace AuthService.Api.Services;
 public class AuthenticationService : IAuthenticationService
 {
     private const string DefaultRoleName = "USER";
+    private static readonly TimeSpan UserCacheTtl = TimeSpan.FromMinutes(1);
 
     private readonly AuthDbContext _db;
     private readonly IPasswordHasher _passwordHasher;
@@ -19,6 +22,7 @@ public class AuthenticationService : IAuthenticationService
     private readonly IJwtTokenService _jwtTokenService;
     private readonly IGoogleIdTokenValidator _googleValidator;
     private readonly IEmailVerificationService _emailVerificationService;
+    private readonly IRedisCache _cache;
     private readonly JwtOptions _jwtOptions;
 
     public AuthenticationService(
@@ -28,6 +32,7 @@ public class AuthenticationService : IAuthenticationService
         IJwtTokenService jwtTokenService,
         IGoogleIdTokenValidator googleValidator,
         IEmailVerificationService emailVerificationService,
+        IRedisCache cache,
         IOptions<JwtOptions> jwtOptions)
     {
         _db = db;
@@ -36,6 +41,7 @@ public class AuthenticationService : IAuthenticationService
         _jwtTokenService = jwtTokenService;
         _googleValidator = googleValidator;
         _emailVerificationService = emailVerificationService;
+        _cache = cache;
         _jwtOptions = jwtOptions.Value;
     }
 
@@ -201,12 +207,28 @@ public class AuthenticationService : IAuthenticationService
 
     public async Task<UserResponse> GetUserAsync(Guid userId, CancellationToken ct)
     {
+        // Pure TTL-expiry cache-aside (see REDIS_INTEGRATION_PLAN.md §2) — never caches the
+        // password hash or any Users column beyond what UserResponse already exposes.
+        var cacheKey = $"cache:auth:user:{userId}";
+        var cached = await _cache.GetStringAsync(cacheKey);
+        if (cached is not null)
+        {
+            var cachedUser = JsonSerializer.Deserialize<UserResponse>(cached);
+            if (cachedUser is not null)
+            {
+                return cachedUser;
+            }
+        }
+
         var user = await _db.Users.FirstOrDefaultAsync(u => u.UserId == userId, ct)
             ?? throw new AuthDomainException(HttpStatusCode.NotFound, "User not found.");
 
         var roles = await GetRoleNamesAsync(userId, ct);
+        var response = new UserResponse(user.UserId, user.Email, user.EmailVerified, user.Status, roles);
 
-        return new UserResponse(user.UserId, user.Email, user.EmailVerified, user.Status, roles);
+        await _cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(response), UserCacheTtl);
+
+        return response;
     }
 
     private async Task<TokenResponse> IssueTokensAsync(User user, CancellationToken ct)

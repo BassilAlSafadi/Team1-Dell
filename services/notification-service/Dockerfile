@@ -1,5 +1,6 @@
 # --- build ---
-FROM golang:1.23-alpine AS build
+# go.mod's `go` directive was bumped to 1.25.0 by adding google.golang.org/grpc — match it here.
+FROM golang:1.25-alpine AS build
 WORKDIR /src
 
 COPY go.mod go.sum ./
@@ -17,5 +18,5 @@ WORKDIR /app
 COPY --from=build /out/notification-service ./notification-service
 
 USER app
-EXPOSE 8080
+EXPOSE 8080 6004
 CMD ["./notification-service"]

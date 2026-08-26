@@ -20,4 +20,17 @@ module.exports = {
     signingKey: process.env.JWT_SIGNING_KEY,
   },
   corsOrigins: (process.env.CORS_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean),
+  grpcPort: Number(process.env.GRPC_PORT) || 6003,
+  grpcPeers: {
+    auth: process.env.AUTH_GRPC_ADDR,
+    transaction: process.env.TRANSACTION_GRPC_ADDR,
+    notification: process.env.NOTIFICATION_GRPC_ADDR,
+    ai: process.env.AI_GRPC_ADDR,
+  },
+  // Optional — the cache-aside layer degrades to a straight Mongo read when this is unset
+  // or still a placeholder, so it's deliberately not in the `required` list above.
+  redisUrl:
+    process.env.REDIS_URL && !process.env.REDIS_URL.startsWith('CHANGE_ME')
+      ? process.env.REDIS_URL
+      : null,
 };

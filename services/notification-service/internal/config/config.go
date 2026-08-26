@@ -17,6 +17,20 @@ type Config struct {
 	JWTAudience   string
 	JWTSigningKey string
 	CORSOrigins   []string
+
+	// gRPC — own listen port, plus the 4 peer addresses this service dials as a
+	// client (own entry omitted; notification-service is the server for its own
+	// proto). No service-to-service auth exists yet, same gap REST has today.
+	GRPCPort            string
+	AuthGRPCAddr        string
+	TransactionGRPCAddr string
+	MessagingGRPCAddr   string
+	AiGRPCAddr          string
+
+	// RedisURL is optional — the unread-count cache-aside layer degrades to a
+	// straight Mongo read when this is unset or still a placeholder, so it's
+	// deliberately not in the `required` list below.
+	RedisURL string
 }
 
 // Load reads .env (if present — Docker/CI supply real env vars instead) and
@@ -33,6 +47,14 @@ func Load() (*Config, error) {
 		JWTAudience:   getEnv("JWT_AUDIENCE", "circular-economy-marketplace"),
 		JWTSigningKey: os.Getenv("JWT_SIGNING_KEY"),
 		CORSOrigins:   splitAndTrim(os.Getenv("CORS_ORIGINS")),
+
+		GRPCPort:            getEnv("GRPC_PORT", "6004"),
+		AuthGRPCAddr:        os.Getenv("AUTH_GRPC_ADDR"),
+		TransactionGRPCAddr: os.Getenv("TRANSACTION_GRPC_ADDR"),
+		MessagingGRPCAddr:   os.Getenv("MESSAGING_GRPC_ADDR"),
+		AiGRPCAddr:          os.Getenv("AI_GRPC_ADDR"),
+
+		RedisURL: os.Getenv("REDIS_URL"),
 	}
 
 	required := map[string]string{

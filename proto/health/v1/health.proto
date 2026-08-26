@@ -1,0 +1,30 @@
+// Vendored copy of the canonical grpc.health.v1.Health service definition
+// (https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
+//
+// C#, Go and Python each ship pre-generated stubs for this via their gRPC health-check
+// libraries (Grpc.AspNetCore.HealthChecks, google.golang.org/grpc/health,
+// grpcio-health-checking) and don't need this file. messaging-service (Node) needs it
+// because @grpc/proto-loader loads .proto text at runtime and grpc-health-check only
+// provides server-side registration, not a client stub.
+syntax = "proto3";
+
+package grpc.health.v1;
+
+message HealthCheckRequest {
+  string service = 1;
+}
+
+message HealthCheckResponse {
+  enum ServingStatus {
+    UNKNOWN = 0;
+    SERVING = 1;
+    NOT_SERVING = 2;
+    SERVICE_UNKNOWN = 3;
+  }
+  ServingStatus status = 1;
+}
+
+service Health {
+  rpc Check(HealthCheckRequest) returns (HealthCheckResponse);
+  rpc Watch(HealthCheckRequest) returns (stream HealthCheckResponse);
+}

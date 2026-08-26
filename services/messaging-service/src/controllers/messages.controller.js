@@ -4,6 +4,7 @@ const ConversationParticipant = require('../models/ConversationParticipant');
 const Message = require('../models/Message');
 const { asyncHandler, HttpError } = require('../middleware/errorHandler');
 const { assertParticipant } = require('../services/participation');
+const { notificationClient } = require('../grpc/clients');
 
 const PREVIEW_LENGTH = 120;
 
@@ -31,7 +32,7 @@ const sendMessage = asyncHandler(async (req, res) => {
     reply_to_message_id: replyToMessageId || null,
   });
 
-  await Conversation.findByIdAndUpdate(conversationId, {
+  const conversation = await Conversation.findByIdAndUpdate(conversationId, {
     $set: {
       last_message: {
         message_id: message._id,
@@ -48,8 +49,41 @@ const sendMessage = asyncHandler(async (req, res) => {
     io.to(`conversation:${conversationId}`).emit('message:new', message);
   }
 
+  // Best-effort: a notification-service outage must never break sending a message.
+  notifyOtherParticipants(conversation, conversationId, req.userId, content).catch((err) => {
+    console.error('Failed to notify conversation participants:', err.message);
+  });
+
   return res.status(201).json(message);
 });
+
+// Notifies every other participant of a direct conversation about a new message. Participant
+// ids here are genuine auth-service user ids (Conversation.participants[].user_id), unlike
+// transaction-service's buyer_id/seller_id.
+function notifyOtherParticipants(conversation, conversationId, senderId, content) {
+  if (!notificationClient || !conversation) return Promise.resolve();
+
+  const recipients = conversation.participants.filter((p) => p.user_id !== senderId);
+
+  return Promise.all(
+    recipients.map(
+      (recipient) =>
+        new Promise((resolve, reject) => {
+          notificationClient.CreateNotification(
+            {
+              user_id: recipient.user_id,
+              type: 'NEW_MESSAGE',
+              title: 'New message',
+              body: content.slice(0, PREVIEW_LENGTH),
+              actor_id: senderId,
+              entity: { type: 'conversation', id: conversationId },
+            },
+            (err) => (err ? reject(err) : resolve())
+          );
+        })
+    )
+  );
+}
 
 // GET /api/conversations/:id/messages?limit=30&before=<ISO date>
 // Thread view: newest first, paged.

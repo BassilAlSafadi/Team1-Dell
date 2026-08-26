@@ -1,19 +1,25 @@
 using System.Net;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using TransactionService.Api.Contracts;
 using TransactionService.Domain.Entities;
 using TransactionService.Domain.Enums;
+using TransactionService.Infrastructure.Caching;
 using TransactionService.Infrastructure.Persistence;
 
 namespace TransactionService.Api.Services;
 
 public class OfferService : IOfferService
 {
-    private readonly TransactionDbContext _db;
+    private static readonly TimeSpan OfferCacheTtl = TimeSpan.FromSeconds(30);
 
-    public OfferService(TransactionDbContext db)
+    private readonly TransactionDbContext _db;
+    private readonly IRedisCache _cache;
+
+    public OfferService(TransactionDbContext db, IRedisCache cache)
     {
         _db = db;
+        _cache = cache;
     }
 
     public async Task<OfferResponse> CreateAsync(Guid listingId, Guid buyerId, Guid sellerId, decimal offeredAmount, string currency, string? message, DateTimeOffset? expiresAt, CancellationToken ct)
@@ -45,8 +51,24 @@ public class OfferService : IOfferService
 
     public async Task<OfferResponse> GetAsync(Guid offerId, CancellationToken ct)
     {
+        // Pure TTL-expiry cache-aside, no write-invalidation (see REDIS_INTEGRATION_PLAN.md §2).
+        var cacheKey = $"cache:transaction:offer:{offerId}";
+        var cached = await _cache.GetStringAsync(cacheKey);
+        if (cached is not null)
+        {
+            var cachedOffer = JsonSerializer.Deserialize<OfferResponse>(cached);
+            if (cachedOffer is not null)
+            {
+                return cachedOffer;
+            }
+        }
+
         var offer = await FindAsync(offerId, ct);
-        return ToResponse(offer);
+        var response = ToResponse(offer);
+
+        await _cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(response), OfferCacheTtl);
+
+        return response;
     }
 
     public async Task<IReadOnlyList<OfferResponse>> ListForBuyerAsync(Guid buyerId, CancellationToken ct)

@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package ai.v1;
+
+option go_package = "notification-service/internal/grpcgen/ai/v1;aiv1";
+
+import "google/protobuf/timestamp.proto";
+
+// Real gRPC entry points for ai-service's own domain logic. ClassifyWaste wraps
+// WasteClassifier.classify + save_classification_result + recommend_vendors;
+// GetRecommendation wraps waste_recommendations.generate_ai_recommendation.
+service AiService {
+  rpc ClassifyWaste(ClassifyWasteRequest) returns (ClassifyWasteResponse);
+  rpc GetRecommendation(GetRecommendationRequest) returns (GetRecommendationResponse);
+}
+
+message ClassifyWasteRequest {
+  string user_id = 1;
+  bytes image_data = 2;
+  string image_name = 3;
+  optional string business_location = 4;
+}
+
+message DetectedItem {
+  string description = 1;
+  string category = 2;
+  double confidence = 3;
+  string material_evidence = 4;
+}
+
+message Vendor {
+  string name = 1;
+  optional double offer_price = 2;
+  optional string location = 3;
+  optional bool pickup_available = 4;
+}
+
+message VendorList {
+  repeated Vendor vendors = 1;
+}
+
+message ClassifyWasteResponse {
+  string classification_id = 1;
+  string primary_category = 2;
+  double confidence = 3;
+  repeated DetectedItem items = 4;
+  bool is_mixed = 5;
+  bool hazard_flag = 6;
+  string hazard_reason = 7;
+  string contamination_notes = 8;
+  string reasoning = 9;
+  bool needs_review = 10;
+  map<string, VendorList> vendors_by_category = 11;
+}
+
+message GetRecommendationRequest {
+  string user_id = 1;
+  int32 scan_limit = 2;
+}
+
+message GetRecommendationResponse {
+  string recommendation_text = 1;
+  google.protobuf.Timestamp generated_at = 2;
+}

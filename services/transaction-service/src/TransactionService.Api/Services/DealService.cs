@@ -1,14 +1,19 @@
 using System.Net;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using TransactionService.Api.Contracts;
+using TransactionService.Api.Grpc;
 using TransactionService.Domain.Entities;
 using TransactionService.Domain.Enums;
+using TransactionService.Infrastructure.Caching;
 using TransactionService.Infrastructure.Persistence;
 
 namespace TransactionService.Api.Services;
 
 public class DealService : IDealService
 {
+    private static readonly TimeSpan DealCacheTtl = TimeSpan.FromSeconds(30);
+
     // Typical flow: AGREED -> HANDOVER_PENDING -> COMPLETED, with CANCELLED/DISPUTED as
     // off-ramps. COMPLETED and CANCELLED are terminal.
     private static readonly Dictionary<DealStatus, DealStatus[]> AllowedTransitions = new()
@@ -21,16 +26,37 @@ public class DealService : IDealService
     };
 
     private readonly TransactionDbContext _db;
+    private readonly INotificationPublisher _notifications;
+    private readonly IRedisCache _cache;
 
-    public DealService(TransactionDbContext db)
+    public DealService(TransactionDbContext db, INotificationPublisher notifications, IRedisCache cache)
     {
         _db = db;
+        _notifications = notifications;
+        _cache = cache;
     }
 
     public async Task<DealResponse> GetAsync(Guid dealId, CancellationToken ct)
     {
+        // Pure TTL-expiry cache-aside, no write-invalidation — lower-stakes staleness than
+        // wallet balance (see REDIS_INTEGRATION_PLAN.md §2).
+        var cacheKey = $"cache:transaction:deal:{dealId}";
+        var cached = await _cache.GetStringAsync(cacheKey);
+        if (cached is not null)
+        {
+            var cachedDeal = JsonSerializer.Deserialize<DealResponse>(cached);
+            if (cachedDeal is not null)
+            {
+                return cachedDeal;
+            }
+        }
+
         var deal = await FindAsync(dealId, ct);
-        return ToResponse(deal);
+        var response = ToResponse(deal);
+
+        await _cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(response), DealCacheTtl);
+
+        return response;
     }
 
     public async Task<IReadOnlyList<DealResponse>> ListForPartyAsync(Guid partyId, CancellationToken ct)
@@ -101,6 +127,19 @@ public class DealService : IDealService
         });
 
         await _db.SaveChangesAsync(ct);
+
+        // Real gRPC domain call (full-mesh plan, plans/pure-hugging-puzzle.md): notify both
+        // parties of the status change via notification-service. buyer_id/seller_id are
+        // Marketplace-service account ids, not auth-service user ids (see the existing comment
+        // on OffersController) — this call fires correctly today, but until marketplace-service
+        // exists to reconcile those ids with real auth-service accounts, the resulting
+        // notification isn't reconcilable to a logged-in user. Never let a notification failure
+        // fail the transition itself — GrpcNotificationPublisher already swallows gRPC errors.
+        var notificationType = target == DealStatus.Completed ? "DEAL_COMPLETED" : "DEAL_STATUS_CHANGED";
+        var title = "Deal status changed";
+        var body = $"Deal moved to {deal.Status}.";
+        await _notifications.PublishAsync(deal.BuyerId.ToString(), notificationType, title, body, changedBy?.ToString(), "deal", deal.DealId.ToString(), ct);
+        await _notifications.PublishAsync(deal.SellerId.ToString(), notificationType, title, body, changedBy?.ToString(), "deal", deal.DealId.ToString(), ct);
 
         return ToResponse(deal);
     }

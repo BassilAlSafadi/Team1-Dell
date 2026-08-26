@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import base64
 import io
-import os
 import sys
 
 from dataclasses import dataclass
@@ -26,6 +25,9 @@ from db.repository import save_classification
 from db.schemas import ClassificationRecord
 from identity import DEMO_USER_ID
 
+# Gemini API key + model fallback handling, shared with waste_recommendations.py/chatbot.
+from gemini_keys import call_with_gemini_fallback
+
 # Agentic RAG: reuse the same Chroma-backed tools (and vector store built by
 # `python -m chatbot.ingest`) that the chat assistant uses, so the classifier consults
 # the same knowledge base instead of maintaining a second copy of it.
@@ -37,14 +39,6 @@ from chatbot.tools import search_egypt_waste_law, search_recycling_guide
 # ============================================================
 
 load_dotenv()
-
-API_KEY = os.getenv("GEMINI_API_KEY")
-
-if not API_KEY:
-    raise ValueError("GEMINI_API_KEY not found in .env")
-
-
-MODEL_NAME = "gemini-3.6-flash"
 
 IMAGE_SUFFIXES = {
     ".jpg",
@@ -316,35 +310,35 @@ and mention any contamination.
 # 5. IMAGE PROCESSING
 # ============================================================
 
-def encode_image(
-    path: Path,
+def _encode_pil_image(
+    img: Image.Image,
     max_edge: int = MAX_EDGE_PX
 ) -> tuple[str, str]:
+    """Shared resize/re-encode step behind encode_image() and encode_image_bytes() —
+    takes an already-opened PIL image, returns (base64 JPEG, mime type)."""
 
-    with Image.open(path) as img:
+    # Fix phone-camera rotation
+    img = ImageOps.exif_transpose(img)
 
-        # Fix phone-camera rotation
-        img = ImageOps.exif_transpose(img)
+    # Convert unsupported formats to RGB
+    if img.mode not in ("RGB", "L"):
+        img = img.convert("RGB")
 
-        # Convert unsupported formats to RGB
-        if img.mode not in ("RGB", "L"):
-            img = img.convert("RGB")
+    # Resize large images
+    img.thumbnail(
+        (max_edge, max_edge),
+        Image.Resampling.LANCZOS
+    )
 
-        # Resize large images
-        img.thumbnail(
-            (max_edge, max_edge),
-            Image.Resampling.LANCZOS
-        )
+    # Convert to JPEG
+    buffer = io.BytesIO()
 
-        # Convert to JPEG
-        buffer = io.BytesIO()
-
-        img.save(
-            buffer,
-            format="JPEG",
-            quality=85,
-            optimize=True
-        )
+    img.save(
+        buffer,
+        format="JPEG",
+        quality=85,
+        optimize=True
+    )
 
     encoded = base64.b64encode(
         buffer.getvalue()
@@ -353,9 +347,27 @@ def encode_image(
     return encoded, "image/jpeg"
 
 
-def build_message(path: Path) -> HumanMessage:
+def encode_image(
+    path: Path,
+    max_edge: int = MAX_EDGE_PX
+) -> tuple[str, str]:
 
-    data, mime = encode_image(path)
+    with Image.open(path) as img:
+        return _encode_pil_image(img, max_edge=max_edge)
+
+
+def encode_image_bytes(
+    data: bytes,
+    max_edge: int = MAX_EDGE_PX
+) -> tuple[str, str]:
+    """Same as encode_image(), for in-memory image bytes (e.g. from a gRPC request)
+    instead of a filesystem path — PIL's Image.open() accepts a file-like object."""
+
+    with Image.open(io.BytesIO(data)) as img:
+        return _encode_pil_image(img, max_edge=max_edge)
+
+
+def _message_from_encoded(data: str, mime: str) -> HumanMessage:
 
     return HumanMessage(
         content=[
@@ -371,6 +383,20 @@ def build_message(path: Path) -> HumanMessage:
             },
         ]
     )
+
+
+def build_message(path: Path) -> HumanMessage:
+
+    data, mime = encode_image(path)
+    return _message_from_encoded(data, mime)
+
+
+def build_message_bytes(data: bytes, image_name: str) -> HumanMessage:
+    """Same as build_message(), for in-memory image bytes. image_name is unused here
+    (kept for symmetry/logging at call sites) — the model only sees the image data."""
+
+    encoded, mime = encode_image_bytes(data)
+    return _message_from_encoded(encoded, mime)
 
 
 # ============================================================
@@ -487,14 +513,29 @@ class WasteClassifier:
 
     def __init__(
         self,
-        model: str = MODEL_NAME,
         temperature: float = 0.0,
     ):
 
+        self._temperature = temperature
+
+        # tool_llm/structured_llm are (re)built per attempt in _build_llms(), since
+        # which model+key to use is decided fresh by call_with_gemini_fallback() every
+        # time — there's no single "the" model/key bound at construction time anymore.
+        self.tool_llm = None
+        self.structured_llm = None
+
+        self.system = SystemMessage(
+            content=SYSTEM_PROMPT
+        )
+
+    def _build_llms(self, model: str, api_key: str) -> None:
+        """(Re)builds tool_llm/structured_llm bound to the given model+key — called once
+        per attempt from _attempt_classification()."""
+
         llm = ChatGoogleGenerativeAI(
             model=model,
-            temperature=temperature,
-            google_api_key=API_KEY,
+            temperature=self._temperature,
+            google_api_key=api_key,
             max_retries=3,
         )
 
@@ -507,10 +548,6 @@ class WasteClassifier:
         self.structured_llm = llm.with_structured_output(
             WasteClassification,
             method="json_schema"
-        )
-
-        self.system = SystemMessage(
-            content=SYSTEM_PROMPT
         )
 
     def _run_agentic_retrieval(self, messages: list) -> None:
@@ -544,39 +581,52 @@ class WasteClassifier:
                     )
                 )
 
-    def classify(
-        self,
-        path: Path
-    ) -> Result:
+    def _attempt_classification(
+        self, model: str, api_key: str, image_message: HumanMessage
+    ) -> WasteClassification:
+        """One (model, api_key) attempt — called by call_with_gemini_fallback(), which
+        retries this with the next model/key in the fallback chain on a retryable
+        failure. Raises on any error; the caller (_classify_from_message) turns a final,
+        unrecoverable failure into Result(error=...)."""
 
-        try:
+        print(f"  🔮 Classifying with model={model}...", file=sys.stderr)
+        self._build_llms(model, api_key)
 
-            messages: list = [
-                self.system,
-                build_message(path),
-            ]
+        messages: list = [
+            self.system,
+            image_message,
+        ]
 
-            self._run_agentic_retrieval(messages)
+        self._run_agentic_retrieval(messages)
 
-            # The retrieval loop can end on an assistant turn (the model's own text
-            # reply once it stops calling tools), which Gemini won't generate from
-            # directly. Add an explicit final turn so the structured-output call
-            # always has a user/function message to respond to.
-            messages.append(
-                HumanMessage(
-                    content=(
-                        "Using the image and anything the tools returned above, give "
-                        "your final waste classification now."
-                    )
+        # The retrieval loop can end on an assistant turn (the model's own text reply
+        # once it stops calling tools), which Gemini won't generate from directly. Add
+        # an explicit final turn so the structured-output call always has a
+        # user/function message to respond to.
+        messages.append(
+            HumanMessage(
+                content=(
+                    "Using the image and anything the tools returned above, give "
+                    "your final waste classification now."
                 )
             )
+        )
 
-            output = self.structured_llm.invoke(messages)
+        return self.structured_llm.invoke(messages)
 
-            return Result(
-                path=path,
-                classification=output
+    def _classify_from_message(self, path: Path, image_message: HumanMessage) -> Result:
+        """Shared classification loop behind classify() and classify_bytes() — both
+        just build the initial image message differently. Tries every
+        (model, api_key) combination in MODEL_FALLBACK_CHAIN x configured keys via
+        call_with_gemini_fallback() before giving up."""
+
+        try:
+            classification = call_with_gemini_fallback(
+                lambda model, api_key: self._attempt_classification(
+                    model, api_key, image_message
+                )
             )
+            return Result(path=path, classification=classification)
 
         except Exception as exc:
 
@@ -585,6 +635,28 @@ class WasteClassifier:
                 classification=None,
                 error=f"{type(exc).__name__}: {exc}"
             )
+
+    def classify(
+        self,
+        path: Path
+    ) -> Result:
+
+        return self._classify_from_message(path, build_message(path))
+
+    def classify_bytes(
+        self,
+        image_bytes: bytes,
+        image_name: str
+    ) -> Result:
+        """Same as classify(), for in-memory image bytes (the gRPC ClassifyWaste path) —
+        Result.path holds a synthetic Path(image_name) purely for display/logging
+        (print_result, save_classification_result use .name), since there's no real
+        file on disk."""
+
+        return self._classify_from_message(
+            Path(image_name),
+            build_message_bytes(image_bytes, image_name),
+        )
 
 
 # ============================================================

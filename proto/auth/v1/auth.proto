@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package auth.v1;
+
+option go_package = "notification-service/internal/grpcgen/auth/v1;authv1";
+
+// Thin 1:1 mirrors of already-tested REST behavior (AuthController.Me, ReviewsController.GetProfile).
+// Exposed for future gRPC consumers; no caller wires this yet in this pass — only
+// notification-service and ai-service are real callees elsewhere in the mesh.
+service AuthService {
+  rpc GetUser(GetUserRequest) returns (UserResponse);
+  rpc GetVendorProfile(GetVendorProfileRequest) returns (VendorProfileResponse);
+}
+
+message GetUserRequest {
+  string user_id = 1;
+}
+
+message UserResponse {
+  string user_id = 1;
+  string email = 2;
+  bool email_verified = 3;
+  string status = 4;
+  repeated string roles = 5;
+}
+
+message GetVendorProfileRequest {
+  string vendor_id = 1;
+}
+
+message VendorProfileResponse {
+  string vendor_id = 1;
+  string email = 2;
+  string status = 3;
+  double average_rating = 4;
+  int32 review_count = 5;
+}

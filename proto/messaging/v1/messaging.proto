@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package messaging.v1;
+
+option go_package = "notification-service/internal/grpcgen/messaging/v1;messagingv1";
+
+import "google/protobuf/timestamp.proto";
+
+// Thin 1:1 mirror of already-tested REST behavior (conversations.controller.js getConversation).
+// Exposed for future gRPC consumers; no caller wires this yet in this pass.
+service MessagingService {
+  rpc GetConversation(GetConversationRequest) returns (ConversationResponse);
+}
+
+message GetConversationRequest {
+  string conversation_id = 1;
+}
+
+message Participant {
+  string user_id = 1;
+  string role = 2;
+}
+
+message LastMessage {
+  string message_id = 1;
+  string sender_id = 2;
+  string content_preview = 3;
+  google.protobuf.Timestamp sent_at = 4;
+}
+
+message ConversationResponse {
+  string conversation_id = 1;
+  repeated Participant participants = 2;
+  string listing_id = 3;
+  LastMessage last_message = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}

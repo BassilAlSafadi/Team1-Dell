@@ -4,6 +4,8 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Root /proto directory shared across all 5 services (see plans/pure-hugging-puzzle.md) -->
+    <ProtoRoot>$(MSBuildThisFileDirectory)..\..\..\..\proto</ProtoRoot>
   </PropertyGroup>
 
   <ItemGroup>
@@ -11,6 +13,19 @@
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.1" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.19" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.8.1" />
+    <PackageReference Include="Grpc.AspNetCore" Version="2.66.0" />
+    <PackageReference Include="Grpc.AspNetCore.HealthChecks" Version="2.66.0" />
+    <PackageReference Include="Grpc.Net.ClientFactory" Version="2.66.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- This service's own contract: served here. -->
+    <Protobuf Include="$(ProtoRoot)\transaction\v1\transaction.proto" ProtoRoot="$(ProtoRoot)" GrpcServices="Server" />
+    <!-- Peer contracts: consumed as clients (full-mesh requirement). -->
+    <Protobuf Include="$(ProtoRoot)\auth\v1\auth.proto" ProtoRoot="$(ProtoRoot)" GrpcServices="Client" />
+    <Protobuf Include="$(ProtoRoot)\messaging\v1\messaging.proto" ProtoRoot="$(ProtoRoot)" GrpcServices="Client" />
+    <Protobuf Include="$(ProtoRoot)\notification\v1\notification.proto" ProtoRoot="$(ProtoRoot)" GrpcServices="Client" />
+    <Protobuf Include="$(ProtoRoot)\ai\v1\ai.proto" ProtoRoot="$(ProtoRoot)" GrpcServices="Client" />
   </ItemGroup>
 
   <ItemGroup>

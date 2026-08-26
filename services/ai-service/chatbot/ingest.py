@@ -22,6 +22,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from chatbot import config
+from gemini_keys import call_with_gemini_fallback
 
 OCR_PROMPT = (
     "You are an OCR engine. Transcribe all Arabic legal text visible in this image "
@@ -42,7 +43,6 @@ def _ocr_law_pdf(force: bool) -> list[Document]:
         )
 
     config.OCR_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    vision_model = ChatGoogleGenerativeAI(model=config.GEMINI_CHAT_MODEL, api_key=config.GEMINI_API_KEY)
 
     doc = pymupdf.open(str(config.EGYPT_LAW_PDF))
     pages_text: list[tuple[int, str]] = []
@@ -65,7 +65,12 @@ def _ocr_law_pdf(force: bool) -> list[Document]:
                     {"type": "image_url", "image_url": f"data:image/png;base64,{b64_image}"},
                 ]
             )
-            response = vision_model.invoke([message])
+
+            def _ocr_call(model: str, api_key: str):
+                vision_model = ChatGoogleGenerativeAI(model=model, api_key=api_key)
+                return vision_model.invoke([message])
+
+            response = call_with_gemini_fallback(_ocr_call)
             text = response.content if isinstance(response.content, str) else str(response.content)
             cache_file.write_text(text, encoding="utf-8")
             print(f"  OCR'd page {page_index + 1}/{doc.page_count}", file=sys.stderr)

@@ -3,6 +3,7 @@ const Conversation = require('../models/Conversation');
 const ConversationParticipant = require('../models/ConversationParticipant');
 const { asyncHandler, HttpError } = require('../middleware/errorHandler');
 const { assertParticipant } = require('../services/participation');
+const { getConversationById } = require('../services/conversationCache');
 
 // POST /api/conversations
 // Starts a direct conversation with another user, or returns the existing one for
@@ -74,7 +75,7 @@ const getConversation = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(id)) throw new HttpError(400, 'Invalid conversation id.');
 
   const participant = await assertParticipant(id, req.userId);
-  const conversation = await Conversation.findById(id);
+  const conversation = await getConversationById(id);
   if (!conversation) throw new HttpError(404, 'Conversation not found.');
 
   return res.json({ conversation, myParticipantState: participant });

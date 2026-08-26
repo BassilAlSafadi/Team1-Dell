@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"notification-service/internal/config"
@@ -13,7 +14,7 @@ import (
 	"notification-service/internal/middleware"
 )
 
-func New(cfg *config.Config, db *mongo.Database) http.Handler {
+func New(cfg *config.Config, db *mongo.Database, redisClient *redis.Client) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(chimiddleware.Logger)
@@ -26,8 +27,9 @@ func New(cfg *config.Config, db *mongo.Database) http.Handler {
 	}))
 
 	r.Get("/health", handlers.Health)
+	r.Get("/internal/mesh/status", handlers.MeshStatus(cfg))
 
-	notificationHandler := handlers.NewNotificationHandler(db)
+	notificationHandler := handlers.NewNotificationHandler(db, redisClient)
 
 	r.Route("/api/notifications", func(r chi.Router) {
 		r.Use(middleware.RequireAuth(cfg))

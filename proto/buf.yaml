@@ -1,0 +1,9 @@
+version: v1
+name: buf.local/team1-dell/proto
+build:
+  # health/v1/health.proto is vendored only so messaging-service (Node) can load real .proto
+  # text at runtime for its outbound health-check client. Go (notification-service) has its
+  # own pre-built grpc_health_v1 package and doesn't need this generated — it also has no
+  # go_package option since no Go import path for it will ever exist.
+  excludes:
+    - health
