@@ -1,5 +1,8 @@
-import { useState, type ReactElement } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, type FormEvent, type ReactElement } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../lib/auth'
+import { api, ApiError } from '../lib/api'
+import GoogleSignInButton from '../components/GoogleSignInButton'
 import './RegisterPage.css'
 
 type Role = 'vendor' | 'business'
@@ -95,9 +98,127 @@ const roles: {
   },
 ]
 
+type Step = 'form' | 'verify'
+
+type FormState = {
+  email: string
+  password: string
+  vendorName: string
+  category: string
+  fulfillment: string
+  operatingHours: string
+  location: string
+  minimumAmount: string
+  orgName: string
+}
+
+const initialFormState: FormState = {
+  email: '',
+  password: '',
+  vendorName: '',
+  category: '',
+  fulfillment: '',
+  operatingHours: '',
+  location: '',
+  minimumAmount: '',
+  orgName: '',
+}
+
 function RegisterPage() {
+  const navigate = useNavigate()
+  const { registerAccount, confirmEmail, login, resendVerification } = useAuth()
+
   const [role, setRole] = useState<Role | null>(null)
   const selectedRole = roles.find((r) => r.id === role) ?? null
+
+  const [step, setStep] = useState<Step>('form')
+  const [form, setForm] = useState<FormState>(initialFormState)
+  const [code, setCode] = useState('')
+
+  const [isRegistering, setIsRegistering] = useState(false)
+  const [isVerifying, setIsVerifying] = useState(false)
+  const [isResending, setIsResending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [resendMessage, setResendMessage] = useState<string | null>(null)
+
+  const updateField = (field: keyof FormState) => (
+    event: { target: { value: string } },
+  ) => {
+    setForm((prev) => ({ ...prev, [field]: event.target.value }))
+  }
+
+  const finishAndRedirect = () => {
+    navigate(role === 'vendor' ? '/vendor-dashboard' : '/dashboard')
+  }
+
+  const handleRegisterSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!role) return
+    setError(null)
+    setIsRegistering(true)
+    try {
+      await registerAccount(form.email, form.password, role === 'vendor' ? 'VENDOR' : 'CORPORATE')
+      setStep('verify')
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.')
+    } finally {
+      setIsRegistering(false)
+    }
+  }
+
+  const handleVerifySubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!role) return
+    setError(null)
+    setIsVerifying(true)
+    try {
+      await confirmEmail(form.email, code)
+      await login(form.email, form.password)
+
+      try {
+        if (role === 'vendor') {
+          await api.post('/api/vendor-profiles', {
+            vendorName: form.vendorName,
+            categoryPreference: form.category || undefined,
+            fulfillmentMethod: form.fulfillment || undefined,
+            operatingHours: form.operatingHours || undefined,
+            locationText: form.location || undefined,
+            minimumAmount: form.minimumAmount ? Number(form.minimumAmount) : undefined,
+          })
+        } else {
+          await api.post('/api/corporate-profiles', {
+            companyName: form.orgName,
+          })
+        }
+      } catch (profileErr) {
+        // A 409 (profile already exists) is not fatal — the account is still in a good
+        // state, so we proceed to redirect regardless of the profile-creation outcome.
+        if (!(profileErr instanceof ApiError && profileErr.status === 409)) {
+          throw profileErr
+        }
+      }
+
+      finishAndRedirect()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.')
+    } finally {
+      setIsVerifying(false)
+    }
+  }
+
+  const handleResend = async () => {
+    setError(null)
+    setResendMessage(null)
+    setIsResending(true)
+    try {
+      await resendVerification(form.email)
+      setResendMessage('A new code has been sent to your email.')
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.')
+    } finally {
+      setIsResending(false)
+    }
+  }
 
   return (
     <div className="register-page">
@@ -153,6 +274,18 @@ function RegisterPage() {
               ))}
             </div>
 
+            <div className="auth-divider">
+              <span>or</span>
+            </div>
+
+            <GoogleSignInButton text="signup_with" onError={setError} />
+
+            {error && (
+              <p className="register-error" role="alert">
+                {error}
+              </p>
+            )}
+
             <p className="signup-hint">
               Already have an account? <Link to="/login">Log in</Link>
             </p>
@@ -176,102 +309,193 @@ function RegisterPage() {
             </div>
 
             <div className="register-form-panel">
-              <form className="register-form">
-                
+              {step === 'form' ? (
+                <>
+                  <form className="register-form" onSubmit={handleRegisterSubmit}>
+                    {selectedRole.id === 'vendor' ? (
+                      <>
+                        <label htmlFor="vendorName"> Vendor Name:</label>
+                        <input
+                          id="vendorName"
+                          name="vendorName"
+                          type="text"
+                          value={form.vendorName}
+                          onChange={updateField('vendorName')}
+                          required
+                        />
 
-                {selectedRole.id === 'vendor' ? (
-                  <>
-                    <label htmlFor="vendorName"> Vendor Name:</label>
-                    <input id="vendorName" name="vendorName" type="text" />
+                        <label htmlFor="category">Category:</label>
+                        <select
+                          id="category"
+                          name="category"
+                          value={form.category}
+                          onChange={updateField('category')}
+                        >
+                          <option value="" disabled>
+                            Select a category
+                          </option>
+                          <option value="plastic">Plastic</option>
+                          <option value="metal">Metal</option>
+                          <option value="paper">Paper &amp; cardboard</option>
+                          <option value="glass">Glass</option>
+                          <option value="electronics">Electronics</option>
+                          <option value="organic">Organic</option>
+                          <option value="mixed">Mixed / other</option>
+                        </select>
 
-                    <label htmlFor="category">Category:</label>
-                    <select id="category" name="category" defaultValue="">
-                      <option value="" disabled>
-                        Select a category
-                      </option>
-                      <option value="plastic">Plastic</option>
-                      <option value="metal">Metal</option>
-                      <option value="paper">Paper &amp; cardboard</option>
-                      <option value="glass">Glass</option>
-                      <option value="electronics">Electronics</option>
-                      <option value="organic">Organic</option>
-                      <option value="mixed">Mixed / other</option>
-                    </select>
+                        <label htmlFor="taxCertificate">
+                          Tax card / certification (for verification):
+                        </label>
+                        <input
+                          id="taxCertificate"
+                          name="taxCertificate"
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                        />
 
-                    <label htmlFor="taxCertificate">
-                      Tax card / certification (for verification):
-                    </label>
+                        <label htmlFor="fulfillment">Drop off or delivery:</label>
+                        <select
+                          id="fulfillment"
+                          name="fulfillment"
+                          value={form.fulfillment}
+                          onChange={updateField('fulfillment')}
+                        >
+                          <option value="" disabled>
+                            Select an option
+                          </option>
+                          <option value="pickup">Drop off</option>
+                          <option value="delivery">Delivery</option>
+                          <option value="both">Both</option>
+                        </select>
+
+                        <label htmlFor="operatingHours">Operating hours:</label>
+                        <input
+                          id="operatingHours"
+                          name="operatingHours"
+                          type="text"
+                          placeholder="e.g. Mon–Fri, 9am–5pm"
+                          value={form.operatingHours}
+                          onChange={updateField('operatingHours')}
+                        />
+
+                        <label htmlFor="location">Location (address):</label>
+                        <input
+                          id="location"
+                          name="location"
+                          type="text"
+                          autoComplete="street-address"
+                          value={form.location}
+                          onChange={updateField('location')}
+                        />
+
+                        <label htmlFor="minimumAmount">
+                          Minimum amount required:
+                        </label>
+                        <input
+                          id="minimumAmount"
+                          name="minimumAmount"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="e.g. 10"
+                          value={form.minimumAmount}
+                          onChange={updateField('minimumAmount')}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <label htmlFor="orgName">Company name:</label>
+                        <input
+                          id="orgName"
+                          name="orgName"
+                          type="text"
+                          value={form.orgName}
+                          onChange={updateField('orgName')}
+                          required
+                        />
+                      </>
+                    )}
+
+                    <label htmlFor="email">Email:</label>
                     <input
-                      id="taxCertificate"
-                      name="taxCertificate"
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png"
+                      id="email"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      value={form.email}
+                      onChange={updateField('email')}
+                      required
                     />
 
-                    <label htmlFor="fulfillment">Drop off or delivery:</label>
-                    <select id="fulfillment" name="fulfillment" defaultValue="">
-                      <option value="" disabled>
-                        Select an option
-                      </option>
-                      <option value="pickup">Drop off</option>
-                      <option value="delivery">Delivery</option>
-                      <option value="both">Both</option>
-                    </select>
-
-                    <label htmlFor="operatingHours">Operating hours:</label>
+                    <label htmlFor="password">Password:</label>
                     <input
-                      id="operatingHours"
-                      name="operatingHours"
+                      id="password"
+                      name="password"
+                      type="password"
+                      autoComplete="new-password"
+                      value={form.password}
+                      onChange={updateField('password')}
+                      required
+                    />
+
+                    {error && (
+                      <p className="register-error" role="alert">
+                        {error}
+                      </p>
+                    )}
+
+                    <button type="submit" className="register-submit" disabled={isRegistering}>
+                      {isRegistering ? 'Creating account…' : 'Create account'}
+                    </button>
+                  </form>
+
+                  <p className="signup-hint">
+                    Already have an account? <Link to="/login">Log in</Link>
+                  </p>
+                </>
+              ) : (
+                <>
+                  <form className="register-form" onSubmit={handleVerifySubmit}>
+                    <p className="verify-hint">
+                      We&apos;ve sent a 6-digit verification code to <strong>{form.email}</strong>.
+                      Enter it below to finish creating your account.
+                    </p>
+
+                    <label htmlFor="code">Verification code:</label>
+                    <input
+                      id="code"
+                      name="code"
                       type="text"
-                      placeholder="e.g. Mon–Fri, 9am–5pm"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      maxLength={6}
+                      value={code}
+                      onChange={(e) => setCode(e.target.value)}
+                      required
                     />
 
-                    <label htmlFor="location">Location (address):</label>
-                    <input
-                      id="location"
-                      name="location"
-                      type="text"
-                      autoComplete="street-address"
-                    />
+                    {error && (
+                      <p className="register-error" role="alert">
+                        {error}
+                      </p>
+                    )}
+                    {resendMessage && <p className="verify-hint">{resendMessage}</p>}
 
-                    <label htmlFor="minimumAmount">
-                      Minimum amount required:
-                    </label>
-                    <input
-                      id="minimumAmount"
-                      name="minimumAmount"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="e.g. 10"
-                    />
-                  </>
-                ) : (
-                  <>
-                    <label htmlFor="orgName">Company name:</label>
-                    <input id="orgName" name="orgName" type="text" />
-                  </>
-                )}
+                    <button type="submit" className="register-submit" disabled={isVerifying}>
+                      {isVerifying ? 'Verifying…' : 'Verify & continue'}
+                    </button>
 
-                <label htmlFor="email">Email:</label>
-                <input id="email" name="email" type="email" autoComplete="email" />
-
-                <label htmlFor="password">Password:</label>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="new-password"
-                />
-
-                <button type="submit" className="register-submit">
-                  Create account
-                </button>
-              </form>
-
-              <p className="signup-hint">
-                Already have an account? <Link to="/login">Log in</Link>
-              </p>
+                    <button
+                      type="button"
+                      className="change-role"
+                      onClick={handleResend}
+                      disabled={isResending}
+                    >
+                      {isResending ? 'Resending…' : 'Resend code'}
+                    </button>
+                  </form>
+                </>
+              )}
             </div>
           </div>
         )}

@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
 using AuthService.Infrastructure.Options;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -29,7 +30,10 @@ public class JwtTokenService : IJwtTokenService
             new(JwtRegisteredClaimNames.Email, email),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
-        claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
+        // Emitted as one "roles" claim holding a real JSON array (not repeated ClaimTypes.Role
+        // claims under the long XML-namespace URI) so the gateway's `json:"roles" []string`
+        // claim parser (gateway/internal/middleware/auth.go) actually finds it.
+        claims.Add(new Claim("roles", JsonSerializer.Serialize(roles), JsonClaimValueTypes.JsonArray));
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

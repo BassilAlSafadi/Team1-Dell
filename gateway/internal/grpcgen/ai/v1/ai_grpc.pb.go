@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	AiService_ClassifyWaste_FullMethodName     = "/ai.v1.AiService/ClassifyWaste"
 	AiService_GetRecommendation_FullMethodName = "/ai.v1.AiService/GetRecommendation"
+	AiService_Chat_FullMethodName              = "/ai.v1.AiService/Chat"
 )
 
 // AiServiceClient is the client API for AiService service.
@@ -33,6 +34,7 @@ const (
 type AiServiceClient interface {
 	ClassifyWaste(ctx context.Context, in *ClassifyWasteRequest, opts ...grpc.CallOption) (*ClassifyWasteResponse, error)
 	GetRecommendation(ctx context.Context, in *GetRecommendationRequest, opts ...grpc.CallOption) (*GetRecommendationResponse, error)
+	Chat(ctx context.Context, in *ChatRequest, opts ...grpc.CallOption) (*ChatResponse, error)
 }
 
 type aiServiceClient struct {
@@ -63,6 +65,16 @@ func (c *aiServiceClient) GetRecommendation(ctx context.Context, in *GetRecommen
 	return out, nil
 }
 
+func (c *aiServiceClient) Chat(ctx context.Context, in *ChatRequest, opts ...grpc.CallOption) (*ChatResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ChatResponse)
+	err := c.cc.Invoke(ctx, AiService_Chat_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AiServiceServer is the server API for AiService service.
 // All implementations should embed UnimplementedAiServiceServer
 // for forward compatibility.
@@ -73,6 +85,7 @@ func (c *aiServiceClient) GetRecommendation(ctx context.Context, in *GetRecommen
 type AiServiceServer interface {
 	ClassifyWaste(context.Context, *ClassifyWasteRequest) (*ClassifyWasteResponse, error)
 	GetRecommendation(context.Context, *GetRecommendationRequest) (*GetRecommendationResponse, error)
+	Chat(context.Context, *ChatRequest) (*ChatResponse, error)
 }
 
 // UnimplementedAiServiceServer should be embedded to have
@@ -87,6 +100,9 @@ func (UnimplementedAiServiceServer) ClassifyWaste(context.Context, *ClassifyWast
 }
 func (UnimplementedAiServiceServer) GetRecommendation(context.Context, *GetRecommendationRequest) (*GetRecommendationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetRecommendation not implemented")
+}
+func (UnimplementedAiServiceServer) Chat(context.Context, *ChatRequest) (*ChatResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Chat not implemented")
 }
 func (UnimplementedAiServiceServer) testEmbeddedByValue() {}
 
@@ -144,6 +160,24 @@ func _AiService_GetRecommendation_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AiService_Chat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ChatRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AiServiceServer).Chat(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AiService_Chat_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AiServiceServer).Chat(ctx, req.(*ChatRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AiService_ServiceDesc is the grpc.ServiceDesc for AiService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -158,6 +192,10 @@ var AiService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetRecommendation",
 			Handler:    _AiService_GetRecommendation_Handler,
+		},
+		{
+			MethodName: "Chat",
+			Handler:    _AiService_Chat_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

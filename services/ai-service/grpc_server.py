@@ -33,7 +33,12 @@ import ai_pb2  # noqa: E402
 import ai_pb2_grpc  # noqa: E402
 import notification_pb2  # noqa: E402
 
+from chatbot import config as chatbot_config  # noqa: E402
+from chatbot.agent import build_llm, new_conversation, run_turn  # noqa: E402
+from db.repository import add_message, create_thread, get_messages_for_thread  # noqa: E402
+from gemini_keys import call_with_gemini_fallback  # noqa: E402
 from grpc_clients import notification_stub  # noqa: E402
+from langchain_core.messages import AIMessage, HumanMessage  # noqa: E402
 from mesh_status import start_mesh_status_server  # noqa: E402
 from vendor_cache import get_vendor_recommendations  # noqa: E402
 from waste_classifier import WasteClassifier, save_classification_result  # noqa: E402
@@ -157,6 +162,50 @@ class AiServiceServicer(ai_pb2_grpc.AiServiceServicer):
             recommendation_text=recommendation_text,
             generated_at=generated_at,
         )
+
+    async def Chat(self, request: ai_pb2.ChatRequest, context):
+        if not chatbot_config.VECTOR_STORE_DIR.exists() or not any(chatbot_config.VECTOR_STORE_DIR.iterdir()):
+            await context.abort(
+                grpc.StatusCode.FAILED_PRECONDITION,
+                "Chat knowledge base not ingested yet - run 'python -m chatbot.ingest' first.",
+            )
+            return ai_pb2.ChatResponse()
+
+        thread_id = request.thread_id if request.HasField("thread_id") and request.thread_id else None
+        if thread_id:
+            messages = new_conversation()
+            for doc in get_messages_for_thread(thread_id):
+                if doc["role"] == "human":
+                    messages.append(HumanMessage(content=doc["content"]))
+                elif doc["role"] == "ai":
+                    messages.append(AIMessage(content=doc["content"]))
+        else:
+            thread_id = create_thread(request.user_id)
+            messages = new_conversation()
+
+        messages.append(HumanMessage(content=request.message))
+        add_message(thread_id, "human", request.message)
+
+        checkpoint = len(messages)
+        response_chunks: list[str] = []
+
+        def attempt(model: str, api_key: str):
+            del messages[checkpoint:]
+            response_chunks.clear()
+            turn_llm = build_llm(model=model, api_key=api_key)
+            return run_turn(messages, turn_llm, on_chunk=response_chunks.append)
+
+        try:
+            await asyncio.to_thread(call_with_gemini_fallback, attempt)
+        except Exception as exc:
+            logger.exception("Chat request failed on every configured Gemini model/key")
+            await context.abort(grpc.StatusCode.INTERNAL, f"Chat request failed: {exc}")
+            return ai_pb2.ChatResponse()
+
+        reply = "".join(response_chunks)
+        add_message(thread_id, "ai", reply)
+
+        return ai_pb2.ChatResponse(reply=reply, thread_id=thread_id)
 
 
 async def serve() -> None:

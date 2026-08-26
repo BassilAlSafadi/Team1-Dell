@@ -168,6 +168,94 @@
   margin-top: 20px;
 }
 
+.scanner-error {
+  margin-top: 12px;
+  font-size: 14px;
+  color: #b3261e;
+}
+
+.scanner-result {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.scanner-result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.scanner-result-header h3 {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.scanner-confidence {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--green-dark);
+}
+
+.scanner-hazard {
+  margin-top: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #96660c;
+}
+
+.scanner-note {
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.scanner-items-list {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.scanner-log-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+
+  label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-h);
+  }
+
+  input {
+    width: 80px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 14px;
+  }
+}
+
+.scanner-log-success {
+  margin-top: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--green-dark);
+}
+
+.activity-empty,
+.impact-empty {
+  margin-top: 20px;
+  font-size: 14px;
+  color: var(--text);
+}
+
 /* Activity panel */
 
 .activity-list {

@@ -47,6 +47,10 @@ func New(cfg *config.Config, clients *grpcclients.Clients, limiter ratelimit.Lim
 	if err != nil {
 		return nil, err
 	}
+	marketplaceProxy, err := proxy.New(cfg.MarketplaceRESTAddr, "marketplace-service", checker)
+	if err != nil {
+		return nil, err
+	}
 
 	r := chi.NewRouter()
 	r.Use(chimiddleware.RequestID)
@@ -118,6 +122,21 @@ func New(cfg *config.Config, clients *grpcclients.Clients, limiter ratelimit.Lim
 		r.Use(requireAuth)
 		r.Post("/api/ai/classify", handlers.ClassifyWaste(clients.Ai))
 		r.Get("/api/ai/recommendation", handlers.Recommendation(clients.Ai))
+		r.Post("/api/ai/chat", handlers.Chat(clients.Ai))
+	})
+
+	// --- marketplace-service (REST-only, no gRPC server — same proxy-only shape as
+	// notification-service above; not registered with the health checker since there's no gRPC
+	// health endpoint to check, so it's treated as always-healthy per health.Checker's design) ---
+	r.Group(func(r chi.Router) {
+		r.Use(requireAuth)
+		// Bare-path routes registered alongside their wildcards — chi's "/*" pattern only
+		// matches a path with a trailing segment, so a bodyless GET/POST straight to the
+		// resource root (e.g. "GET /api/categories", "POST /api/listings") needs its own entry.
+		for _, prefix := range []string{"/api/vendor-profiles", "/api/corporate-profiles", "/api/categories", "/api/listings"} {
+			r.Handle(prefix, marketplaceProxy)
+			r.Handle(prefix+"/*", marketplaceProxy)
+		}
 	})
 
 	return r, nil

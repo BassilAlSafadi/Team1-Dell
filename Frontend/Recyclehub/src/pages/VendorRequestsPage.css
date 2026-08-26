@@ -1,3 +1,9 @@
+.table-state {
+  padding: 24px 0;
+  color: var(--text);
+  font-size: 15px;
+}
+
 .request-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

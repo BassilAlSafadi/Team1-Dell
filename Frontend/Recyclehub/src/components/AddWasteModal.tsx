@@ -1,16 +1,73 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
+import { api, ApiError } from '../lib/api'
 import './AddWasteModal.css'
+
+type CategoryResponse = {
+  categoryId: number
+  name: string
+  description: string | null
+  parentCategoryId: number | null
+}
 
 type AddWasteModalProps = {
   onClose: () => void
+  onCreated?: () => void
 }
 
-function AddWasteModal({ onClose }: AddWasteModalProps) {
+function AddWasteModal({ onClose, onCreated = () => {} }: AddWasteModalProps) {
   const [submitted, setSubmitted] = useState(false)
+  const [categories, setCategories] = useState<CategoryResponse[]>([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleSubmit = (event: FormEvent) => {
+  useEffect(() => {
+    let cancelled = false
+    api
+      .get<CategoryResponse[]>('/api/categories')
+      .then((data) => {
+        if (!cancelled) setCategories(data)
+      })
+      .catch(() => {
+        // Categories failing to load isn't fatal on its own — submit will surface
+        // a clear error if it can't resolve a category id.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setSubmitted(true)
+    setError(null)
+
+    const formData = new FormData(event.currentTarget)
+    const wasteType = String(formData.get('wasteType') ?? '')
+    const weight = Number(formData.get('weight'))
+    const notes = String(formData.get('notes') ?? '').trim()
+
+    const category = categories.find((c) => c.name === wasteType)
+    if (!category) {
+      setError('Could not resolve a category for this waste type. Please try again.')
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      await api.post('/api/listings', {
+        title: wasteType,
+        description: notes || undefined,
+        categoryId: category.categoryId,
+        condition: 'MIXED',
+        quantity: weight,
+        unit: 'KG',
+      })
+      setSubmitted(true)
+      onCreated()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to log waste item. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -60,12 +117,14 @@ function AddWasteModal({ onClose }: AddWasteModalProps) {
             <label htmlFor="notes">Notes (optional)</label>
             <textarea id="notes" name="notes" rows={3} />
 
+            {error && <p className="modal-error">{error}</p>}
+
             <div className="modal-actions">
-              <button type="button" className="btn-secondary" onClick={onClose}>
+              <button type="button" className="btn-secondary" onClick={onClose} disabled={isSubmitting}>
                 Cancel
               </button>
-              <button type="submit" className="btn-primary">
-                Save Item
+              <button type="submit" className="btn-primary" disabled={isSubmitting}>
+                {isSubmitting ? 'Saving…' : 'Save Item'}
               </button>
             </div>
           </form>

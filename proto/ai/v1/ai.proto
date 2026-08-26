@@ -12,6 +12,7 @@ import "google/protobuf/timestamp.proto";
 service AiService {
   rpc ClassifyWaste(ClassifyWasteRequest) returns (ClassifyWasteResponse);
   rpc GetRecommendation(GetRecommendationRequest) returns (GetRecommendationResponse);
+  rpc Chat(ChatRequest) returns (ChatResponse);
 }
 
 message ClassifyWasteRequest {
@@ -61,4 +62,15 @@ message GetRecommendationRequest {
 message GetRecommendationResponse {
   string recommendation_text = 1;
   google.protobuf.Timestamp generated_at = 2;
+}
+
+message ChatRequest {
+  string user_id = 1;
+  string message = 2;
+  optional string thread_id = 3;
+}
+
+message ChatResponse {
+  string reply = 1;
+  string thread_id = 2;
 }

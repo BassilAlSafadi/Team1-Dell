@@ -47,6 +47,11 @@ class AiServiceStub(object):
                 request_serializer=ai__pb2.GetRecommendationRequest.SerializeToString,
                 response_deserializer=ai__pb2.GetRecommendationResponse.FromString,
                 _registered_method=True)
+        self.Chat = channel.unary_unary(
+                '/ai.v1.AiService/Chat',
+                request_serializer=ai__pb2.ChatRequest.SerializeToString,
+                response_deserializer=ai__pb2.ChatResponse.FromString,
+                _registered_method=True)
 
 
 class AiServiceServicer(object):
@@ -67,6 +72,12 @@ class AiServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def Chat(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_AiServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -79,6 +90,11 @@ def add_AiServiceServicer_to_server(servicer, server):
                     servicer.GetRecommendation,
                     request_deserializer=ai__pb2.GetRecommendationRequest.FromString,
                     response_serializer=ai__pb2.GetRecommendationResponse.SerializeToString,
+            ),
+            'Chat': grpc.unary_unary_rpc_method_handler(
+                    servicer.Chat,
+                    request_deserializer=ai__pb2.ChatRequest.FromString,
+                    response_serializer=ai__pb2.ChatResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -138,6 +154,33 @@ class AiService(object):
             '/ai.v1.AiService/GetRecommendation',
             ai__pb2.GetRecommendationRequest.SerializeToString,
             ai__pb2.GetRecommendationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Chat(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/ai.v1.AiService/Chat',
+            ai__pb2.ChatRequest.SerializeToString,
+            ai__pb2.ChatResponse.FromString,
             options,
             channel_credentials,
             insecure,

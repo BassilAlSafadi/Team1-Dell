@@ -1,0 +1,13 @@
+.google-signin-button {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.google-signin-button > div {
+  width: 100% !important;
+}
+
+.google-signin-button iframe {
+  margin: 0 auto;
+}

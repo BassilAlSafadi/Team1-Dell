@@ -30,6 +30,7 @@ type Config struct {
 	TransactionRESTAddr  string
 	MessagingRESTAddr    string
 	NotificationRESTAddr string
+	MarketplaceRESTAddr  string
 
 	RedisURL string
 
@@ -60,6 +61,7 @@ func Load() (*Config, error) {
 		TransactionRESTAddr:  os.Getenv("TRANSACTION_REST_ADDR"),
 		MessagingRESTAddr:    os.Getenv("MESSAGING_REST_ADDR"),
 		NotificationRESTAddr: os.Getenv("NOTIFICATION_REST_ADDR"),
+		MarketplaceRESTAddr:  os.Getenv("MARKETPLACE_REST_ADDR"),
 
 		RedisURL: os.Getenv("REDIS_URL"),
 
@@ -78,6 +80,7 @@ func Load() (*Config, error) {
 		"TRANSACTION_REST_ADDR":  cfg.TransactionRESTAddr,
 		"MESSAGING_REST_ADDR":    cfg.MessagingRESTAddr,
 		"NOTIFICATION_REST_ADDR": cfg.NotificationRESTAddr,
+		"MARKETPLACE_REST_ADDR":  cfg.MarketplaceRESTAddr,
 		"REDIS_URL":              cfg.RedisURL,
 	}
 	var missing []string

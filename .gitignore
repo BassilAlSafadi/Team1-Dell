@@ -22,3 +22,6 @@ npm-debug.log*
 # Go
 services/notification-service/notification-service
 services/notification-service/*.exe
+
+# run-services.sh output
+/logs/

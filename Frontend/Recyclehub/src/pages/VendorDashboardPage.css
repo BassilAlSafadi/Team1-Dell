@@ -38,6 +38,12 @@
   max-width: 620px;
 }
 
+.table-state {
+  padding: 24px 0;
+  color: var(--text);
+  font-size: 15px;
+}
+
 .welcome-actions {
   display: flex;
   gap: 16px;

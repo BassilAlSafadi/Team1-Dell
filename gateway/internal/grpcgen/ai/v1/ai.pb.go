@@ -498,6 +498,118 @@ func (x *GetRecommendationResponse) GetGeneratedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+type ChatRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	ThreadId      *string                `protobuf:"bytes,3,opt,name=thread_id,json=threadId,proto3,oneof" json:"thread_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChatRequest) Reset() {
+	*x = ChatRequest{}
+	mi := &file_ai_v1_ai_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChatRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChatRequest) ProtoMessage() {}
+
+func (x *ChatRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_ai_v1_ai_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChatRequest.ProtoReflect.Descriptor instead.
+func (*ChatRequest) Descriptor() ([]byte, []int) {
+	return file_ai_v1_ai_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ChatRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *ChatRequest) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *ChatRequest) GetThreadId() string {
+	if x != nil && x.ThreadId != nil {
+		return *x.ThreadId
+	}
+	return ""
+}
+
+type ChatResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Reply         string                 `protobuf:"bytes,1,opt,name=reply,proto3" json:"reply,omitempty"`
+	ThreadId      string                 `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChatResponse) Reset() {
+	*x = ChatResponse{}
+	mi := &file_ai_v1_ai_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChatResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChatResponse) ProtoMessage() {}
+
+func (x *ChatResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ai_v1_ai_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChatResponse.ProtoReflect.Descriptor instead.
+func (*ChatResponse) Descriptor() ([]byte, []int) {
+	return file_ai_v1_ai_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ChatResponse) GetReply() string {
+	if x != nil {
+		return x.Reply
+	}
+	return ""
+}
+
+func (x *ChatResponse) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
+	}
+	return ""
+}
+
 var File_ai_v1_ai_proto protoreflect.FileDescriptor
 
 const file_ai_v1_ai_proto_rawDesc = "" +
@@ -555,10 +667,20 @@ const file_ai_v1_ai_proto_rawDesc = "" +
 	"scan_limit\x18\x02 \x01(\x05R\tscanLimit\"\x8b\x01\n" +
 	"\x19GetRecommendationResponse\x12/\n" +
 	"\x13recommendation_text\x18\x01 \x01(\tR\x12recommendationText\x12=\n" +
-	"\fgenerated_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\vgeneratedAt2\xaf\x01\n" +
+	"\fgenerated_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\vgeneratedAt\"p\n" +
+	"\vChatRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12 \n" +
+	"\tthread_id\x18\x03 \x01(\tH\x00R\bthreadId\x88\x01\x01B\f\n" +
+	"\n" +
+	"_thread_id\"A\n" +
+	"\fChatResponse\x12\x14\n" +
+	"\x05reply\x18\x01 \x01(\tR\x05reply\x12\x1b\n" +
+	"\tthread_id\x18\x02 \x01(\tR\bthreadId2\xe0\x01\n" +
 	"\tAiService\x12J\n" +
 	"\rClassifyWaste\x12\x1b.ai.v1.ClassifyWasteRequest\x1a\x1c.ai.v1.ClassifyWasteResponse\x12V\n" +
-	"\x11GetRecommendation\x12\x1f.ai.v1.GetRecommendationRequest\x1a .ai.v1.GetRecommendationResponseB2Z0notification-service/internal/grpcgen/ai/v1;aiv1b\x06proto3"
+	"\x11GetRecommendation\x12\x1f.ai.v1.GetRecommendationRequest\x1a .ai.v1.GetRecommendationResponse\x12/\n" +
+	"\x04Chat\x12\x12.ai.v1.ChatRequest\x1a\x13.ai.v1.ChatResponseB2Z0notification-service/internal/grpcgen/ai/v1;aiv1b\x06proto3"
 
 var (
 	file_ai_v1_ai_proto_rawDescOnce sync.Once
@@ -572,7 +694,7 @@ func file_ai_v1_ai_proto_rawDescGZIP() []byte {
 	return file_ai_v1_ai_proto_rawDescData
 }
 
-var file_ai_v1_ai_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_ai_v1_ai_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_ai_v1_ai_proto_goTypes = []any{
 	(*ClassifyWasteRequest)(nil),      // 0: ai.v1.ClassifyWasteRequest
 	(*DetectedItem)(nil),              // 1: ai.v1.DetectedItem
@@ -581,24 +703,28 @@ var file_ai_v1_ai_proto_goTypes = []any{
 	(*ClassifyWasteResponse)(nil),     // 4: ai.v1.ClassifyWasteResponse
 	(*GetRecommendationRequest)(nil),  // 5: ai.v1.GetRecommendationRequest
 	(*GetRecommendationResponse)(nil), // 6: ai.v1.GetRecommendationResponse
-	nil,                               // 7: ai.v1.ClassifyWasteResponse.VendorsByCategoryEntry
-	(*timestamppb.Timestamp)(nil),     // 8: google.protobuf.Timestamp
+	(*ChatRequest)(nil),               // 7: ai.v1.ChatRequest
+	(*ChatResponse)(nil),              // 8: ai.v1.ChatResponse
+	nil,                               // 9: ai.v1.ClassifyWasteResponse.VendorsByCategoryEntry
+	(*timestamppb.Timestamp)(nil),     // 10: google.protobuf.Timestamp
 }
 var file_ai_v1_ai_proto_depIdxs = []int32{
-	2, // 0: ai.v1.VendorList.vendors:type_name -> ai.v1.Vendor
-	1, // 1: ai.v1.ClassifyWasteResponse.items:type_name -> ai.v1.DetectedItem
-	7, // 2: ai.v1.ClassifyWasteResponse.vendors_by_category:type_name -> ai.v1.ClassifyWasteResponse.VendorsByCategoryEntry
-	8, // 3: ai.v1.GetRecommendationResponse.generated_at:type_name -> google.protobuf.Timestamp
-	3, // 4: ai.v1.ClassifyWasteResponse.VendorsByCategoryEntry.value:type_name -> ai.v1.VendorList
-	0, // 5: ai.v1.AiService.ClassifyWaste:input_type -> ai.v1.ClassifyWasteRequest
-	5, // 6: ai.v1.AiService.GetRecommendation:input_type -> ai.v1.GetRecommendationRequest
-	4, // 7: ai.v1.AiService.ClassifyWaste:output_type -> ai.v1.ClassifyWasteResponse
-	6, // 8: ai.v1.AiService.GetRecommendation:output_type -> ai.v1.GetRecommendationResponse
-	7, // [7:9] is the sub-list for method output_type
-	5, // [5:7] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	2,  // 0: ai.v1.VendorList.vendors:type_name -> ai.v1.Vendor
+	1,  // 1: ai.v1.ClassifyWasteResponse.items:type_name -> ai.v1.DetectedItem
+	9,  // 2: ai.v1.ClassifyWasteResponse.vendors_by_category:type_name -> ai.v1.ClassifyWasteResponse.VendorsByCategoryEntry
+	10, // 3: ai.v1.GetRecommendationResponse.generated_at:type_name -> google.protobuf.Timestamp
+	3,  // 4: ai.v1.ClassifyWasteResponse.VendorsByCategoryEntry.value:type_name -> ai.v1.VendorList
+	0,  // 5: ai.v1.AiService.ClassifyWaste:input_type -> ai.v1.ClassifyWasteRequest
+	5,  // 6: ai.v1.AiService.GetRecommendation:input_type -> ai.v1.GetRecommendationRequest
+	7,  // 7: ai.v1.AiService.Chat:input_type -> ai.v1.ChatRequest
+	4,  // 8: ai.v1.AiService.ClassifyWaste:output_type -> ai.v1.ClassifyWasteResponse
+	6,  // 9: ai.v1.AiService.GetRecommendation:output_type -> ai.v1.GetRecommendationResponse
+	8,  // 10: ai.v1.AiService.Chat:output_type -> ai.v1.ChatResponse
+	8,  // [8:11] is the sub-list for method output_type
+	5,  // [5:8] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_ai_v1_ai_proto_init() }
@@ -608,13 +734,14 @@ func file_ai_v1_ai_proto_init() {
 	}
 	file_ai_v1_ai_proto_msgTypes[0].OneofWrappers = []any{}
 	file_ai_v1_ai_proto_msgTypes[2].OneofWrappers = []any{}
+	file_ai_v1_ai_proto_msgTypes[7].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ai_v1_ai_proto_rawDesc), len(file_ai_v1_ai_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

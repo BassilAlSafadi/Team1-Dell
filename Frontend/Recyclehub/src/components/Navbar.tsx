@@ -1,8 +1,28 @@
-import { useState } from 'react'
-import { Link, NavLink } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
+import { useAuth } from '../lib/auth'
+import { api } from '../lib/api'
 import './Navbar.css'
 
 type NavbarVariant = 'business' | 'vendor'
+
+type NotificationEntity = {
+  type?: string
+  id?: string
+} | null
+
+type NotificationDto = {
+  id: string
+  userId: string
+  type: string
+  title: string
+  body: string
+  actorId?: string
+  entity?: NotificationEntity
+  isRead: boolean
+  createdAt: string
+  readAt?: string
+}
 
 const navLinksByVariant: Record<NavbarVariant, { label: string; to: string }[]> = {
   business: [
@@ -20,28 +40,72 @@ const navLinksByVariant: Record<NavbarVariant, { label: string; to: string }[]> 
   ],
 }
 
-const notificationsByVariant: Record<NavbarVariant, { id: number; text: string; time: string }[]> = {
-  business: [
-    { id: 1, text: 'Your plastic sale (45 EGP) was confirmed.', time: '2h ago' },
-    { id: 2, text: 'GreenLoop Vendor accepted your offer.', time: '1d ago' },
-    { id: 3, text: 'AI scan complete: Glass Bottle, high value.', time: '2d ago' },
-  ],
-  vendor: [
-    { id: 1, text: 'New pickup request from GreenMart Supermarket.', time: '2h ago' },
-    { id: 2, text: 'Cafe Nour rated your last pickup 5 stars.', time: '1d ago' },
-    { id: 3, text: 'Payment of 220 EGP received.', time: '2d ago' },
-  ],
+function timeAgo(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime()
+  const minutes = Math.floor(diffMs / 60000)
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
 }
 
-function Navbar({ variant = 'business' }: { variant?: NavbarVariant }) {
+function Navbar({ variant: variantOverride }: { variant?: NavbarVariant }) {
+  const navigate = useNavigate()
+  const { isAuthenticated, isVendor, user, logout } = useAuth()
+  const variant: NavbarVariant = variantOverride ?? (isVendor ? 'vendor' : 'business')
+
   const [openMenu, setOpenMenu] = useState<'notifications' | 'account' | null>(null)
+  const [notifications, setNotifications] = useState<NotificationDto[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
+
   const navLinks = navLinksByVariant[variant]
-  const notifications = notificationsByVariant[variant]
   const homeTo = variant === 'vendor' ? '/vendor-dashboard' : '/dashboard'
-  const accountLabel = variant === 'vendor' ? '[Vendor Name]' : '[Business Name]'
+  const accountLabel = user?.email ?? ''
 
   const toggleMenu = (menu: 'notifications' | 'account') => {
     setOpenMenu((current) => (current === menu ? null : menu))
+  }
+
+  const refreshNotifications = async () => {
+    try {
+      const [list, unread] = await Promise.all([
+        api.get<NotificationDto[]>('/api/notifications', { limit: 10 }),
+        api.get<{ unreadCount: number }>('/api/notifications/unread-count'),
+      ])
+      setNotifications(list)
+      setUnreadCount(unread.unreadCount)
+    } catch {
+      // best-effort — leave existing notifications in place on a transient failure
+    }
+  }
+
+  useEffect(() => {
+    if (!isAuthenticated) return
+    refreshNotifications()
+    const interval = setInterval(refreshNotifications, 20000)
+    return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated])
+
+  const handleNotificationClick = async (notification: NotificationDto) => {
+    if (notification.isRead) return
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n)),
+    )
+    setUnreadCount((prev) => Math.max(0, prev - 1))
+    try {
+      await api.patch(`/api/notifications/${notification.id}/read`)
+    } catch {
+      // best-effort optimistic update — a background refresh will reconcile
+    }
+    refreshNotifications()
+  }
+
+  const handleLogout = async () => {
+    await logout()
+    navigate('/')
   }
 
   return (
@@ -82,66 +146,80 @@ function Navbar({ variant = 'business' }: { variant?: NavbarVariant }) {
         )}
       </nav>
 
-      <div className="nav-actions-group">
-        <div className="menu-anchor">
-          <button
-            type="button"
-            className="icon-btn"
-            aria-label="Notifications"
-            onClick={() => toggleMenu('notifications')}
-          >
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M18 16v-5a6 6 0 1 0-12 0v5l-2 3h16l-2-3Z"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M9.5 20a2.5 2.5 0 0 0 5 0"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              />
-            </svg>
-            <span className="notif-badge" aria-hidden="true" />
-          </button>
+      {isAuthenticated && (
+        <div className="nav-actions-group">
+          <div className="menu-anchor">
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label="Notifications"
+              onClick={() => toggleMenu('notifications')}
+            >
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M18 16v-5a6 6 0 1 0-12 0v5l-2 3h16l-2-3Z"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M9.5 20a2.5 2.5 0 0 0 5 0"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              </svg>
+              {unreadCount > 0 && <span className="notif-badge" aria-hidden="true" />}
+            </button>
 
-          {openMenu === 'notifications' && (
-            <div className="dropdown notif-dropdown">
-              <p className="dropdown-title">Notifications</p>
-              <ul>
-                {notifications.map((n) => (
-                  <li key={n.id}>
-                    <p>{n.text}</p>
-                    <span>{n.time}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+            {openMenu === 'notifications' && (
+              <div className="dropdown notif-dropdown">
+                <p className="dropdown-title">Notifications</p>
+                <ul>
+                  {notifications.length === 0 ? (
+                    <li>
+                      <p>No notifications yet.</p>
+                    </li>
+                  ) : (
+                    notifications.map((n) => (
+                      <li key={n.id}>
+                        <button
+                          type="button"
+                          className="notif-item"
+                          onClick={() => handleNotificationClick(n)}
+                        >
+                          <p>{n.isRead ? n.title : <strong>{n.title}</strong>}</p>
+                          <span>{timeAgo(n.createdAt)}</span>
+                        </button>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          <div className="menu-anchor">
+            <button
+              type="button"
+              className="user-avatar"
+              aria-label="Account menu"
+              onClick={() => toggleMenu('account')}
+            >
+              {accountLabel ? accountLabel.charAt(0).toUpperCase() : 'U'}
+            </button>
+
+            {openMenu === 'account' && (
+              <div className="dropdown account-dropdown">
+                <p className="dropdown-title">{accountLabel}</p>
+                <button type="button" className="dropdown-link" onClick={handleLogout}>
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-
-        <div className="menu-anchor">
-          <button
-            type="button"
-            className="user-avatar"
-            aria-label="Account menu"
-            onClick={() => toggleMenu('account')}
-          >
-            U
-          </button>
-
-          {openMenu === 'account' && (
-            <div className="dropdown account-dropdown">
-              <p className="dropdown-title">{accountLabel}</p>
-              <Link to="/login" className="dropdown-link">
-                Logout
-              </Link>
-            </div>
-          )}
-        </div>
-      </div>
+      )}
 
       {openMenu && (
         <button

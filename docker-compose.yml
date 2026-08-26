@@ -26,9 +26,10 @@ services:
       TRANSACTION_REST_ADDR: "transaction-service:8080"
       MESSAGING_REST_ADDR: "messaging-service:8080"
       NOTIFICATION_REST_ADDR: "notification-service:8080"
+      MARKETPLACE_REST_ADDR: "marketplace-service:8080"
     ports:
       - "8080:8080"
-    depends_on: [auth-service, transaction-service, messaging-service, notification-service, ai-service]
+    depends_on: [auth-service, transaction-service, messaging-service, notification-service, ai-service, marketplace-service]
     networks: [mesh]
 
   auth-service:
@@ -106,6 +107,12 @@ services:
     ports:
       - "6005:6005"
       - "7005:7005"
+    networks: [mesh]
+
+  marketplace-service:
+    build: ./services/marketplace-service
+    env_file: ./services/marketplace-service/.env
+    expose: ["8080"]
     networks: [mesh]
 
 networks:

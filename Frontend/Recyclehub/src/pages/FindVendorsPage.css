@@ -1,3 +1,19 @@
+.vendor-status {
+  padding: 32px 0;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.vendor-status-error {
+  color: #b3261e;
+}
+
+.vendor-contact-error {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #b3261e;
+}
+
 .vendor-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

@@ -3,6 +3,13 @@
   overflow-x: auto;
 }
 
+.table-state {
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--text);
+  font-size: 15px;
+}
+
 .transactions-table {
   width: 100%;
   border-collapse: collapse;

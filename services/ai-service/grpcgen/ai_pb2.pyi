@@ -96,3 +96,21 @@ class GetRecommendationResponse(_message.Message):
     recommendation_text: str
     generated_at: _timestamp_pb2.Timestamp
     def __init__(self, recommendation_text: _Optional[str] = ..., generated_at: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+
+class ChatRequest(_message.Message):
+    __slots__ = ("user_id", "message", "thread_id")
+    USER_ID_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    THREAD_ID_FIELD_NUMBER: _ClassVar[int]
+    user_id: str
+    message: str
+    thread_id: str
+    def __init__(self, user_id: _Optional[str] = ..., message: _Optional[str] = ..., thread_id: _Optional[str] = ...) -> None: ...
+
+class ChatResponse(_message.Message):
+    __slots__ = ("reply", "thread_id")
+    REPLY_FIELD_NUMBER: _ClassVar[int]
+    THREAD_ID_FIELD_NUMBER: _ClassVar[int]
+    reply: str
+    thread_id: str
+    def __init__(self, reply: _Optional[str] = ..., thread_id: _Optional[str] = ...) -> None: ...

@@ -1,59 +1,111 @@
+import { useEffect, useState } from 'react'
 import Navbar from '../components/Navbar'
 import ChatbotWidget from '../components/ChatbotWidget'
+import { api, ApiError } from '../lib/api'
 import './FindVendorsPage.css'
 
-const vendors = [
-  {
-    id: 1,
-    name: 'GreenLoop Recycling',
-    materials: ['Plastic', 'Glass', 'Metal'],
-    location: 'Nasr City, Cairo',
-    distance: '1.2 km away',
-    rating: '4.8',
-  },
-  {
-    id: 2,
-    name: 'EcoTrade Vendors',
-    materials: ['Cardboard', 'Paper'],
-    location: 'Maadi, Cairo',
-    distance: '3.4 km away',
-    rating: '4.6',
-  },
-  {
-    id: 3,
-    name: 'MetalWorks Co.',
-    materials: ['Metal', 'Electronics'],
-    location: 'Heliopolis, Cairo',
-    distance: '5.1 km away',
-    rating: '4.9',
-  },
-  {
-    id: 4,
-    name: 'Cairo Glass Exchange',
-    materials: ['Glass'],
-    location: '6th of October',
-    distance: '8.0 km away',
-    rating: '4.5',
-  },
-  {
-    id: 5,
-    name: 'PlastiCycle',
-    materials: ['Plastic'],
-    location: 'Dokki, Giza',
-    distance: '2.6 km away',
-    rating: '4.7',
-  },
-  {
-    id: 6,
-    name: 'PaperTrail Recyclers',
-    materials: ['Paper', 'Cardboard'],
-    location: 'Zamalek, Cairo',
-    distance: '4.3 km away',
-    rating: '4.4',
-  },
-]
+type VendorProfileResponse = {
+  vendorId: string
+  userId: string
+  vendorName: string
+  description: string | null
+  businessRegistrationNumber: string | null
+  categoryPreference: string | null
+  fulfillmentMethod: string | null
+  operatingHours: string | null
+  locationText: string | null
+  minimumAmount: number | null
+  verificationStatus: string
+  verifiedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+type AuthVendorProfile = {
+  vendorId: string
+  email: string
+  status: string
+  averageRating: number
+  reviewCount: number
+}
+
+type RatingInfo = { averageRating: number; reviewCount: number } | null
+
+type ContactState = 'idle' | 'loading' | 'done' | 'error'
+
+function vendorMaterials(vendor: VendorProfileResponse): string[] {
+  if (!vendor.categoryPreference) return []
+  return vendor.categoryPreference
+    .split(',')
+    .map((m) => m.trim())
+    .filter(Boolean)
+}
 
 function FindVendorsPage() {
+  const [vendors, setVendors] = useState<VendorProfileResponse[]>([])
+  const [ratings, setRatings] = useState<Record<string, RatingInfo>>({})
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [contactState, setContactState] = useState<Record<string, ContactState>>({})
+  const [contactError, setContactError] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function load() {
+      setIsLoading(true)
+      setError(null)
+      try {
+        const data = await api.get<VendorProfileResponse[]>('/api/vendor-profiles')
+        if (cancelled) return
+        setVendors(data)
+
+        const ratingEntries = await Promise.all(
+          data.map(async (vendor) => {
+            try {
+              const profile = await api.get<AuthVendorProfile>(`/api/vendors/${vendor.userId}/profile`)
+              return [vendor.userId, { averageRating: profile.averageRating, reviewCount: profile.reviewCount }] as const
+            } catch {
+              return [vendor.userId, null] as const
+            }
+          }),
+        )
+        if (cancelled) return
+        setRatings(Object.fromEntries(ratingEntries))
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof ApiError ? err.message : 'Failed to load vendors.')
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false)
+      }
+    }
+
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const handleContact = async (vendor: VendorProfileResponse) => {
+    setContactState((prev) => ({ ...prev, [vendor.userId]: 'loading' }))
+    setContactError((prev) => {
+      const next = { ...prev }
+      delete next[vendor.userId]
+      return next
+    })
+    try {
+      await api.post('/api/conversations', { participantUserId: vendor.userId })
+      setContactState((prev) => ({ ...prev, [vendor.userId]: 'done' }))
+    } catch (err) {
+      setContactState((prev) => ({ ...prev, [vendor.userId]: 'error' }))
+      setContactError((prev) => ({
+        ...prev,
+        [vendor.userId]: err instanceof ApiError ? err.message : 'Failed to start conversation.',
+      }))
+    }
+  }
+
   return (
     <div className="page">
       <Navbar />
@@ -64,30 +116,57 @@ function FindVendorsPage() {
           <p>Registered local vendors ready to buy your recyclables.</p>
         </div>
 
-        <div className="vendor-grid">
-          {vendors.map((vendor) => (
-            <article className="vendor-card" key={vendor.id}>
-              <div className="vendor-card-top">
-                <h2>{vendor.name}</h2>
-                <span className="vendor-rating">★ {vendor.rating}</span>
-              </div>
+        {isLoading ? (
+          <p className="vendor-status">Loading vendors…</p>
+        ) : error ? (
+          <p className="vendor-status vendor-status-error">{error}</p>
+        ) : vendors.length === 0 ? (
+          <p className="vendor-status">No vendors found.</p>
+        ) : (
+          <div className="vendor-grid">
+            {vendors.map((vendor) => {
+              const rating = ratings[vendor.userId]
+              const state = contactState[vendor.userId] ?? 'idle'
+              return (
+                <article className="vendor-card" key={vendor.vendorId}>
+                  <div className="vendor-card-top">
+                    <h2>{vendor.vendorName}</h2>
+                    <span className="vendor-rating">
+                      ★ {rating ? rating.averageRating.toFixed(1) : '—'}
+                      {rating ? ` (${rating.reviewCount})` : ''}
+                    </span>
+                  </div>
 
-              <p className="vendor-location">{vendor.location} · {vendor.distance}</p>
+                  <p className="vendor-location">{vendor.locationText || 'Location not specified'}</p>
 
-              <div className="vendor-tags">
-                {vendor.materials.map((material) => (
-                  <span className="vendor-tag" key={material}>
-                    {material}
-                  </span>
-                ))}
-              </div>
+                  <div className="vendor-tags">
+                    {vendorMaterials(vendor).map((material) => (
+                      <span className="vendor-tag" key={material}>
+                        {material}
+                      </span>
+                    ))}
+                  </div>
 
-              <button type="button" className="btn-secondary">
-                Contact Vendor
-              </button>
-            </article>
-          ))}
-        </div>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={state === 'loading' || state === 'done'}
+                    onClick={() => handleContact(vendor)}
+                  >
+                    {state === 'loading'
+                      ? 'Contacting…'
+                      : state === 'done'
+                        ? 'Contacted'
+                        : 'Contact Vendor'}
+                  </button>
+                  {state === 'error' && (
+                    <p className="vendor-contact-error">{contactError[vendor.userId]}</p>
+                  )}
+                </article>
+              )
+            })}
+          </div>
+        )}
       </main>
 
       <ChatbotWidget />

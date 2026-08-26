@@ -1,10 +1,16 @@
 import { useState, type FormEvent } from 'react'
+import { api, ApiError } from '../lib/api'
 import './ChatbotWidget.css'
 
 type Message = {
   id: number
   sender: 'bot' | 'user'
   text: string
+}
+
+type ChatResponse = {
+  reply: string
+  threadId: string
 }
 
 const initialMessages: Message[] = [
@@ -19,22 +25,30 @@ function ChatbotWidget() {
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>(initialMessages)
   const [draft, setDraft] = useState('')
+  const [threadId, setThreadId] = useState<string | undefined>(undefined)
+  const [isSending, setIsSending] = useState(false)
 
-  const handleSend = (event: FormEvent) => {
+  const handleSend = async (event: FormEvent) => {
     event.preventDefault()
     const text = draft.trim()
-    if (!text) return
+    if (!text || isSending) return
 
     const userMessage: Message = { id: Date.now(), sender: 'user', text }
-    // Placeholder reply until this is wired to a real chatbot backend.
-    const botReply: Message = {
-      id: Date.now() + 1,
-      sender: 'bot',
-      text: 'Thanks for your message — a team member or our AI assistant will follow up shortly.',
-    }
-
-    setMessages((prev) => [...prev, userMessage, botReply])
+    setMessages((prev) => [...prev, userMessage])
     setDraft('')
+    setIsSending(true)
+
+    try {
+      const response = await api.post<ChatResponse>('/api/ai/chat', { message: text, threadId })
+      setThreadId(response.threadId)
+      setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'bot', text: response.reply }])
+    } catch (err) {
+      const errorText =
+        err instanceof ApiError ? err.message : 'Something went wrong reaching the assistant. Please try again.'
+      setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'bot', text: errorText }])
+    } finally {
+      setIsSending(false)
+    }
   }
 
   return (
@@ -94,6 +108,11 @@ function ChatbotWidget() {
                 {message.text}
               </div>
             ))}
+            {isSending && (
+              <div className="chatbot-message bot typing" aria-live="polite">
+                Typing…
+              </div>
+            )}
           </div>
 
           <form className="chatbot-input-row" onSubmit={handleSend}>
@@ -103,8 +122,9 @@ function ChatbotWidget() {
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               aria-label="Message"
+              disabled={isSending}
             />
-            <button type="submit" aria-label="Send message">
+            <button type="submit" aria-label="Send message" disabled={isSending}>
               <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path
                   d="M4 20l16-8L4 4v6l10 2-10 2v6Z"

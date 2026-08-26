@@ -36,6 +36,18 @@
   font-weight: 700;
 }
 
+.amount-negative {
+  color: #a3312c;
+  font-weight: 700;
+}
+
+.table-state {
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--text);
+  font-size: 15px;
+}
+
 .status-badge {
   display: inline-flex;
   align-items: center;

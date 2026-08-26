@@ -20,7 +20,7 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<ActionResult<UserResponse>> Register(RegisterRequest request, CancellationToken ct)
     {
-        var user = await _authenticationService.RegisterAsync(request.Email, request.Password, ct);
+        var user = await _authenticationService.RegisterAsync(request.Email, request.Password, request.AccountType, ct);
         return Ok(user);
     }
 

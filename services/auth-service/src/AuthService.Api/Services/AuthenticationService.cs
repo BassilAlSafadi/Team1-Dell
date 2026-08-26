@@ -14,6 +14,7 @@ namespace AuthService.Api.Services;
 public class AuthenticationService : IAuthenticationService
 {
     private const string DefaultRoleName = "USER";
+    private static readonly HashSet<string> SelfAssignableRoles = new(StringComparer.OrdinalIgnoreCase) { "VENDOR", "CORPORATE" };
     private static readonly TimeSpan UserCacheTtl = TimeSpan.FromMinutes(1);
 
     private readonly AuthDbContext _db;
@@ -45,9 +46,19 @@ public class AuthenticationService : IAuthenticationService
         _jwtOptions = jwtOptions.Value;
     }
 
-    public async Task<UserResponse> RegisterAsync(string email, string password, CancellationToken ct)
+    public async Task<UserResponse> RegisterAsync(string email, string password, string? accountType, CancellationToken ct)
     {
         var normalizedEmail = Normalize(email);
+
+        string roleName = DefaultRoleName;
+        if (!string.IsNullOrWhiteSpace(accountType))
+        {
+            if (!SelfAssignableRoles.Contains(accountType))
+            {
+                throw new AuthDomainException(HttpStatusCode.BadRequest, "accountType must be VENDOR or CORPORATE.");
+            }
+            roleName = accountType.ToUpperInvariant();
+        }
 
         var exists = await _db.Users.AnyAsync(u => u.Email == normalizedEmail, ct);
         if (exists)
@@ -79,13 +90,13 @@ public class AuthenticationService : IAuthenticationService
 
         _db.Users.Add(user);
         _db.AuthIdentities.Add(identity);
-        await AssignDefaultRoleAsync(user.UserId, ct);
+        await AssignRoleAsync(user.UserId, roleName, ct);
 
         await _db.SaveChangesAsync(ct);
 
         await _emailVerificationService.SendCodeAsync(normalizedEmail, ct);
 
-        return new UserResponse(user.UserId, user.Email, user.EmailVerified, user.Status, new[] { DefaultRoleName });
+        return new UserResponse(user.UserId, user.Email, user.EmailVerified, user.Status, new[] { roleName });
     }
 
     public async Task<TokenResponse> LoginAsync(string email, string password, CancellationToken ct)
@@ -256,9 +267,12 @@ public class AuthenticationService : IAuthenticationService
         return new TokenResponse(accessToken, rawRefreshToken, accessTokenExpiresAt);
     }
 
-    private async Task AssignDefaultRoleAsync(Guid userId, CancellationToken ct)
+    private async Task AssignDefaultRoleAsync(Guid userId, CancellationToken ct) =>
+        await AssignRoleAsync(userId, DefaultRoleName, ct);
+
+    private async Task AssignRoleAsync(Guid userId, string roleName, CancellationToken ct)
     {
-        var role = await _db.Roles.FirstOrDefaultAsync(r => r.Name == DefaultRoleName, ct);
+        var role = await _db.Roles.FirstOrDefaultAsync(r => r.Name == roleName, ct);
         if (role is null)
         {
             return;

@@ -48,9 +48,26 @@ builder.Services.AddScoped<INotificationPublisher, GrpcNotificationPublisher>();
 
 builder.WebHost.ConfigureKestrel(options =>
 {
+    // Once ConfigureKestrel adds an explicit Listen*/ListenAnyIP endpoint, Kestrel stops
+    // honoring ASPNETCORE_URLS/--urls entirely for THIS process (a documented Kestrel
+    // behavior) — so the REST HTTP/1.1 endpoint has to be re-added explicitly here too, or
+    // only the gRPC port ends up listening at all.
     var grpcPort = builder.Configuration.GetValue("Grpc:Port", 6002);
     options.ListenAnyIP(grpcPort, listenOptions => listenOptions.Protocols = HttpProtocols.Http2);
+    options.ListenAnyIP(GetHttpPort(), listenOptions => listenOptions.Protocols = HttpProtocols.Http1AndHttp2);
 });
+
+static int GetHttpPort()
+{
+    var urls = Environment.GetEnvironmentVariable("ASPNETCORE_URLS");
+    var firstUrl = urls?.Split(';', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+    if (firstUrl is not null
+        && Uri.TryCreate(firstUrl.Replace("+", "localhost", StringComparison.Ordinal), UriKind.Absolute, out var parsed))
+    {
+        return parsed.Port;
+    }
+    return 8080;
+}
 
 var jwtSection = builder.Configuration.GetSection(JwtOptions.SectionName);
 builder.Services

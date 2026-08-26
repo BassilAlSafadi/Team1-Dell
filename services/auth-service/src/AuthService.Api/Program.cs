@@ -58,10 +58,25 @@ builder.Services.AddGrpcClient<global::Ai.V1.AiService.AiServiceClient>((sp, o) 
 var grpcPort = builder.Configuration.GetValue<int?>("Grpc:Port") ?? 6001;
 builder.WebHost.ConfigureKestrel(options =>
 {
-    // Additive gRPC endpoint alongside the existing ASPNETCORE_URLS-driven HTTP/1.1 REST
-    // endpoint — REST is untouched, gRPC needs its own HTTP/2 port.
+    // Once ConfigureKestrel adds an explicit Listen*/ListenAnyIP endpoint, Kestrel stops
+    // honoring ASPNETCORE_URLS/--urls entirely for THIS process (a documented Kestrel
+    // behavior, not a bug on our side) — so the REST HTTP/1.1 endpoint has to be re-added
+    // explicitly here too, or only the gRPC port ends up listening at all.
     options.ListenAnyIP(grpcPort, listenOptions => listenOptions.Protocols = HttpProtocols.Http2);
+    options.ListenAnyIP(GetHttpPort(), listenOptions => listenOptions.Protocols = HttpProtocols.Http1AndHttp2);
 });
+
+static int GetHttpPort()
+{
+    var urls = Environment.GetEnvironmentVariable("ASPNETCORE_URLS");
+    var firstUrl = urls?.Split(';', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+    if (firstUrl is not null
+        && Uri.TryCreate(firstUrl.Replace("+", "localhost", StringComparison.Ordinal), UriKind.Absolute, out var parsed))
+    {
+        return parsed.Port;
+    }
+    return 8080;
+}
 
 var jwtSection = builder.Configuration.GetSection(JwtOptions.SectionName);
 builder.Services

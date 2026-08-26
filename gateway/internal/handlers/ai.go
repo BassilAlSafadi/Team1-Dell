@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"strconv"
@@ -126,6 +127,52 @@ func Recommendation(client aiv1.AiServiceClient) http.HandlerFunc {
 
 		transform.WriteJSON(w, http.StatusOK, map[string]any{
 			"recommendationText": resp.GetRecommendationText(),
+		})
+	}
+}
+
+// Chat handles POST /api/ai/chat over gRPC — the RAG chatbot.
+func Chat(client aiv1.AiServiceClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID := middleware.UserID(r)
+		if userID == "" {
+			transform.WriteError(w, http.StatusUnauthorized, "Missing bearer token.")
+			return
+		}
+
+		var body struct {
+			Message  string `json:"message"`
+			ThreadID string `json:"threadId"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			transform.WriteError(w, http.StatusBadRequest, "Invalid JSON body: "+err.Error())
+			return
+		}
+		if body.Message == "" {
+			transform.WriteError(w, http.StatusBadRequest, "message is required.")
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(transform.WithIdentity(r.Context(), r), 60*time.Second)
+		defer cancel()
+
+		req := &aiv1.ChatRequest{
+			UserId:  userID,
+			Message: body.Message,
+		}
+		if body.ThreadID != "" {
+			req.ThreadId = &body.ThreadID
+		}
+
+		resp, err := client.Chat(ctx, req)
+		if err != nil {
+			transform.WriteGRPCError(w, err)
+			return
+		}
+
+		transform.WriteJSON(w, http.StatusOK, map[string]any{
+			"reply":    resp.GetReply(),
+			"threadId": resp.GetThreadId(),
 		})
 	}
 }

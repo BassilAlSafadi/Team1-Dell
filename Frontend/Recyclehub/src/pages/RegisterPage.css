@@ -162,6 +162,31 @@
   font-size: 15px;
 }
 
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 320px;
+  margin: 32px auto 0;
+  color: var(--text);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+
+  &::before,
+  &::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+}
+
+.role-picker .google-signin-button {
+  max-width: 320px;
+  margin: 16px auto 0;
+}
+
 .signup-hint {
   margin-top: 32px;
   font-size: 14px;
@@ -344,6 +369,18 @@
       color: #fff;
     }
   }
+}
+
+.register-error {
+  margin-top: 12px;
+  font-size: 14px;
+  color: #c0392b;
+}
+
+.verify-hint {
+  margin-top: 0;
+  font-size: 14px;
+  color: var(--text);
 }
 
 .register-submit {
