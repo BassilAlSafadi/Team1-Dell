@@ -77,9 +77,11 @@ function formatAmount(amount: number, currency: string): string {
   return `${sign}${formatted} ${currency}`
 }
 
-async function fetchDealsForParty(partyId: string): Promise<DealResponse[]> {
+// The deals endpoint is scoped to the signed-in user's own marketplace accounts server-side,
+// so there is no longer a party id to pass (and passing one used to expose other users' deals).
+async function fetchMyDeals(): Promise<DealResponse[]> {
   try {
-    return await api.get<DealResponse[]>(`/api/deals/party/${partyId}`)
+    return await api.get<DealResponse[]>('/api/deals/mine')
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) return []
     throw err
@@ -157,7 +159,7 @@ function TransactionsPage() {
 
       try {
         const [deals, walletTx] = await Promise.all([
-          fetchDealsForParty(corporateId),
+          fetchMyDeals(),
           fetchWalletTransactions(),
         ])
         if (!cancelled) setRows(mergeRows(deals, walletTx))

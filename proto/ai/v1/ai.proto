@@ -13,6 +13,11 @@ service AiService {
   rpc ClassifyWaste(ClassifyWasteRequest) returns (ClassifyWasteResponse);
   rpc GetRecommendation(GetRecommendationRequest) returns (GetRecommendationResponse);
   rpc Chat(ChatRequest) returns (ChatResponse);
+  // Same request as Chat, but streams the reply as it's generated instead of waiting for
+  // the full turn. `reset` marks a Gemini fallback retry restarting the reply from
+  // scratch — any text_delta already received for this turn should be discarded and
+  // display should start over. `done` marks the final chunk (empty text_delta).
+  rpc ChatStream(ChatRequest) returns (stream ChatChunk);
 }
 
 message ClassifyWasteRequest {
@@ -73,4 +78,11 @@ message ChatRequest {
 message ChatResponse {
   string reply = 1;
   string thread_id = 2;
+}
+
+message ChatChunk {
+  string text_delta = 1;
+  string thread_id = 2;
+  bool done = 3;
+  bool reset = 4;
 }

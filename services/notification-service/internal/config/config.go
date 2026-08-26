@@ -18,9 +18,12 @@ type Config struct {
 	JWTSigningKey string
 	CORSOrigins   []string
 
+	// InternalServiceToken is the mesh's shared secret. Required: it gates the gRPC
+	// surface and the notification write path, both of which are backend-only.
+	InternalServiceToken string
+
 	// gRPC — own listen port, plus the 4 peer addresses this service dials as a
-	// client (own entry omitted; notification-service is the server for its own
-	// proto). No service-to-service auth exists yet, same gap REST has today.
+	// client (own entry omitted; notification-service is the server for its own proto).
 	GRPCPort            string
 	AuthGRPCAddr        string
 	TransactionGRPCAddr string
@@ -55,6 +58,8 @@ func Load() (*Config, error) {
 		AiGRPCAddr:          os.Getenv("AI_GRPC_ADDR"),
 
 		RedisURL: os.Getenv("REDIS_URL"),
+
+		InternalServiceToken: os.Getenv("INTERNAL_SERVICE_TOKEN"),
 	}
 
 	required := map[string]string{

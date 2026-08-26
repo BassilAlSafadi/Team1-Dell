@@ -26,6 +26,7 @@ builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection(SmtpOpt
 builder.Services.Configure<EmailVerificationOptions>(builder.Configuration.GetSection(EmailVerificationOptions.SectionName));
 builder.Services.Configure<GrpcOptions>(builder.Configuration.GetSection(GrpcOptions.SectionName));
 builder.Services.Configure<RedisOptions>(builder.Configuration.GetSection(RedisOptions.SectionName));
+builder.Services.Configure<InternalOptions>(builder.Configuration.GetSection(InternalOptions.SectionName));
 
 builder.Services.AddDbContext<AuthDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("AuthDb")));
@@ -35,6 +36,7 @@ builder.Services.AddScoped<ITokenHasher, TokenHasher>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IGoogleIdTokenValidator, GoogleIdTokenValidator>();
 builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
+builder.Services.AddScoped<ILoginThrottle, LoginThrottle>();
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddScoped<IEmailVerificationService, EmailVerificationService>();
 builder.Services.AddScoped<IPasswordResetService, PasswordResetService>();
@@ -42,18 +44,24 @@ builder.Services.AddScoped<IReviewService, ReviewService>();
 builder.Services.AddScoped<INotificationPublisher, GrpcNotificationPublisher>();
 builder.Services.AddSingleton<IRedisCache, RedisCache>();
 
-builder.Services.AddGrpc();
+builder.Services.AddGrpc(options => options.Interceptors.Add<InternalAuthInterceptor>());
+builder.Services.AddSingleton<InternalAuthInterceptor>();
+builder.Services.AddSingleton<InternalTokenClientInterceptor>();
 builder.Services.AddGrpcHealthChecks()
     .AddCheck("auth-service", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy());
 
 builder.Services.AddGrpcClient<global::Transaction.V1.TransactionService.TransactionServiceClient>((sp, o) =>
-    o.Address = new Uri(sp.GetRequiredService<IOptions<GrpcOptions>>().Value.Peers.Transaction ?? "http://localhost:6002"));
+    o.Address = new Uri(sp.GetRequiredService<IOptions<GrpcOptions>>().Value.Peers.Transaction ?? "http://localhost:6002"))
+    .AddInterceptor<InternalTokenClientInterceptor>();
 builder.Services.AddGrpcClient<global::Messaging.V1.MessagingService.MessagingServiceClient>((sp, o) =>
-    o.Address = new Uri(sp.GetRequiredService<IOptions<GrpcOptions>>().Value.Peers.Messaging ?? "http://localhost:6003"));
+    o.Address = new Uri(sp.GetRequiredService<IOptions<GrpcOptions>>().Value.Peers.Messaging ?? "http://localhost:6003"))
+    .AddInterceptor<InternalTokenClientInterceptor>();
 builder.Services.AddGrpcClient<global::Notification.V1.NotificationService.NotificationServiceClient>((sp, o) =>
-    o.Address = new Uri(sp.GetRequiredService<IOptions<GrpcOptions>>().Value.Peers.Notification ?? "http://localhost:6004"));
+    o.Address = new Uri(sp.GetRequiredService<IOptions<GrpcOptions>>().Value.Peers.Notification ?? "http://localhost:6004"))
+    .AddInterceptor<InternalTokenClientInterceptor>();
 builder.Services.AddGrpcClient<global::Ai.V1.AiService.AiServiceClient>((sp, o) =>
-    o.Address = new Uri(sp.GetRequiredService<IOptions<GrpcOptions>>().Value.Peers.Ai ?? "http://localhost:6005"));
+    o.Address = new Uri(sp.GetRequiredService<IOptions<GrpcOptions>>().Value.Peers.Ai ?? "http://localhost:6005"))
+    .AddInterceptor<InternalTokenClientInterceptor>();
 
 var grpcPort = builder.Configuration.GetValue<int?>("Grpc:Port") ?? 6001;
 builder.WebHost.ConfigureKestrel(options =>

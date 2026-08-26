@@ -26,6 +26,8 @@ public class ListingService : IListingService
         "ACTIVE", "RESERVED", "SOLD", "COMPLETED", "CANCELLED", "EXPIRED"
     };
 
+    private const int MaxPageSize = 100;
+
     private readonly MarketplaceDbContext _db;
 
     public ListingService(MarketplaceDbContext db)
@@ -81,19 +83,31 @@ public class ListingService : IListingService
         return await ToResponseAsync(listing, ct);
     }
 
-    public async Task<IReadOnlyList<ListingResponse>> ListMineAsync(Guid ownerId, CancellationToken ct)
+    public async Task<IReadOnlyList<ListingResponse>> ListMineAsync(Guid ownerId, int page, int pageSize, CancellationToken ct)
     {
+        (page, pageSize) = ClampPaging(page, pageSize);
+
         var listings = await _db.Listings
             .Where(l => l.OwnerId == ownerId)
             .OrderByDescending(l => l.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync(ct);
 
         return await ToResponsesAsync(listings, ct);
     }
 
-    public async Task<IReadOnlyList<ListingResponse>> SearchAsync(string? status, short? categoryId, CancellationToken ct)
+    public async Task<IReadOnlyList<ListingResponse>> SearchAsync(
+        string? status, short? categoryId, int page, int pageSize, CancellationToken ct)
     {
+        (page, pageSize) = ClampPaging(page, pageSize);
+
         var effectiveStatus = string.IsNullOrWhiteSpace(status) ? "ACTIVE" : status;
+
+        if (!AllowedStatuses.Contains(effectiveStatus))
+        {
+            throw new MarketplaceDomainException(HttpStatusCode.BadRequest, $"Invalid status '{effectiveStatus}'.");
+        }
 
         var query = _db.Listings.Where(l => l.Status == effectiveStatus);
 
@@ -102,7 +116,11 @@ public class ListingService : IListingService
             query = query.Where(l => l.CategoryId == categoryId);
         }
 
-        var listings = await query.OrderByDescending(l => l.CreatedAt).ToListAsync(ct);
+        var listings = await query
+            .OrderByDescending(l => l.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
 
         return await ToResponsesAsync(listings, ct);
     }
@@ -133,6 +151,14 @@ public class ListingService : IListingService
         await _db.SaveChangesAsync(ct);
 
         return await ToResponseAsync(listing, ct);
+    }
+
+    // Unbounded ToListAsync() let a single request pull every listing of a status into memory.
+    private static (int Page, int PageSize) ClampPaging(int page, int pageSize)
+    {
+        page = page < 1 ? 1 : page;
+        pageSize = pageSize < 1 ? 20 : Math.Min(pageSize, MaxPageSize);
+        return (page, pageSize);
     }
 
     private async Task<Listing> FindAsync(Guid listingId, CancellationToken ct)

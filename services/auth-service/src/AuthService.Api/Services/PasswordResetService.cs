@@ -68,6 +68,8 @@ public class PasswordResetService : IPasswordResetService
 
     public async Task ConfirmResetAsync(string email, string token, string newPassword, CancellationToken ct)
     {
+        PasswordPolicy.Validate(newPassword);
+
         var normalizedEmail = email.Trim().ToLowerInvariant();
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == normalizedEmail, ct)
             ?? throw new AuthDomainException(HttpStatusCode.BadRequest, "Invalid or expired token.");

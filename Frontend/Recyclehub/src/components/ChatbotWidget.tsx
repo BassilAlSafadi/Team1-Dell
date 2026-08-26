@@ -1,16 +1,16 @@
 import { useState, type FormEvent } from 'react'
-import { api, ApiError } from '../lib/api'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { streamChat } from '../lib/api'
 import './ChatbotWidget.css'
 
 type Message = {
   id: number
   sender: 'bot' | 'user'
   text: string
-}
-
-type ChatResponse = {
-  reply: string
-  threadId: string
+  /** True from the moment a bot message is created until its stream's `done`/`error`
+   * event — drives the loading spinner (empty text) vs. growing markdown (has text). */
+  isStreaming?: boolean
 }
 
 const initialMessages: Message[] = [
@@ -34,19 +34,45 @@ function ChatbotWidget() {
     if (!text || isSending) return
 
     const userMessage: Message = { id: Date.now(), sender: 'user', text }
-    setMessages((prev) => [...prev, userMessage])
+    const botMessageId = Date.now() + 1
+    setMessages((prev) => [...prev, userMessage, { id: botMessageId, sender: 'bot', text: '', isStreaming: true }])
     setDraft('')
     setIsSending(true)
 
+    const setBotText = (updater: (prevText: string) => string) => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === botMessageId ? { ...m, text: updater(m.text) } : m)),
+      )
+    }
+    const stopStreaming = () => {
+      setMessages((prev) => prev.map((m) => (m.id === botMessageId ? { ...m, isStreaming: false } : m)))
+    }
+
     try {
-      const response = await api.post<ChatResponse>('/api/ai/chat', { message: text, threadId })
-      setThreadId(response.threadId)
-      setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'bot', text: response.reply }])
-    } catch (err) {
-      const errorText =
-        err instanceof ApiError ? err.message : 'Something went wrong reaching the assistant. Please try again.'
-      setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'bot', text: errorText }])
+      for await (const event of streamChat(text, threadId)) {
+        switch (event.type) {
+          case 'delta':
+            setBotText((prevText) => prevText + event.text)
+            break
+          case 'reset':
+            setBotText(() => '')
+            break
+          case 'done':
+            setThreadId(event.threadId)
+            stopStreaming()
+            break
+          case 'error':
+            setBotText(() => event.message)
+            stopStreaming()
+            break
+        }
+      }
+    } catch {
+      // A dropped connection mid-stream throws out of the generator instead of yielding a
+      // clean 'error' event — same fallback message as the non-streaming request path used.
+      setBotText(() => 'Something went wrong reaching the assistant. Please try again.')
     } finally {
+      stopStreaming()
       setIsSending(false)
     }
   }
@@ -103,15 +129,22 @@ function ChatbotWidget() {
           </div>
 
           <div className="chatbot-messages">
-            {messages.map((message) => (
-              <div className={`chatbot-message ${message.sender}`} key={message.id}>
-                {message.text}
-              </div>
-            ))}
-            {isSending && (
-              <div className="chatbot-message bot typing" aria-live="polite">
-                Typing…
-              </div>
+            {messages.map((message) =>
+              message.sender === 'bot' && message.isStreaming && !message.text ? (
+                <div className="chatbot-message bot loading" key={message.id} aria-live="polite" aria-label="Assistant is thinking">
+                  <span className="chatbot-spinner" />
+                </div>
+              ) : (
+                <div className={`chatbot-message ${message.sender}`} key={message.id}>
+                  {message.sender === 'bot' ? (
+                    <div className="chatbot-markdown">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.text}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    message.text
+                  )}
+                </div>
+              ),
             )}
           </div>
 

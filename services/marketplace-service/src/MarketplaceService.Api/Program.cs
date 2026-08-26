@@ -14,6 +14,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddEnvironmentVariables();
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
+builder.Services.Configure<InternalOptions>(builder.Configuration.GetSection(InternalOptions.SectionName));
 
 builder.Services.AddDbContext<MarketplaceDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("MarketplaceDb")));

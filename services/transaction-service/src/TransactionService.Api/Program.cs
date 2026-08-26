@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using TransactionService.Api.Grpc;
+using TransactionService.Api.Identity;
 using TransactionService.Api.Middleware;
 using TransactionService.Api.Services;
 using TransactionService.Infrastructure.Caching;
@@ -20,6 +21,7 @@ builder.Configuration.AddEnvironmentVariables();
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.Configure<GrpcOptions>(builder.Configuration.GetSection(GrpcOptions.SectionName));
 builder.Services.Configure<RedisOptions>(builder.Configuration.GetSection(RedisOptions.SectionName));
+builder.Services.Configure<InternalOptions>(builder.Configuration.GetSection(InternalOptions.SectionName));
 
 builder.Services.AddDbContext<TransactionDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("TransactionDb")));
@@ -30,20 +32,32 @@ builder.Services.AddScoped<IOfferService, OfferService>();
 builder.Services.AddScoped<IDealService, DealService>();
 builder.Services.AddSingleton<IRedisCache, RedisCache>();
 
+// Resolves auth-service user ids to the marketplace account ids they own, which every
+// authorization check in this service depends on. Short timeout: it sits on the request path,
+// and a slow answer must fail fast rather than hold the caller open.
+builder.Services.AddHttpClient<IMarketplaceAccountResolver, MarketplaceAccountResolver>(client =>
+    client.Timeout = TimeSpan.FromSeconds(5));
+
 // gRPC: server for this service's own contract, clients for all 4 peers (full-mesh
 // requirement — see plans/pure-hugging-puzzle.md), served on a second Kestrel endpoint
 // alongside the existing REST port since gRPC needs HTTP/2.
-builder.Services.AddGrpc();
+builder.Services.AddGrpc(options => options.Interceptors.Add<InternalAuthInterceptor>());
+builder.Services.AddSingleton<InternalAuthInterceptor>();
+builder.Services.AddSingleton<InternalTokenClientInterceptor>();
 builder.Services.AddGrpcHealthChecks()
     .AddCheck("transaction-service", () => HealthCheckResult.Healthy());
 builder.Services.AddGrpcClient<Auth.V1.AuthService.AuthServiceClient>(o =>
-    o.Address = new Uri(builder.Configuration["Grpc:Peers:Auth"] ?? "http://localhost:6001"));
+    o.Address = new Uri(builder.Configuration["Grpc:Peers:Auth"] ?? "http://localhost:6001"))
+    .AddInterceptor<InternalTokenClientInterceptor>();
 builder.Services.AddGrpcClient<Messaging.V1.MessagingService.MessagingServiceClient>(o =>
-    o.Address = new Uri(builder.Configuration["Grpc:Peers:Messaging"] ?? "http://localhost:6003"));
+    o.Address = new Uri(builder.Configuration["Grpc:Peers:Messaging"] ?? "http://localhost:6003"))
+    .AddInterceptor<InternalTokenClientInterceptor>();
 builder.Services.AddGrpcClient<Notification.V1.NotificationService.NotificationServiceClient>(o =>
-    o.Address = new Uri(builder.Configuration["Grpc:Peers:Notification"] ?? "http://localhost:6004"));
+    o.Address = new Uri(builder.Configuration["Grpc:Peers:Notification"] ?? "http://localhost:6004"))
+    .AddInterceptor<InternalTokenClientInterceptor>();
 builder.Services.AddGrpcClient<Ai.V1.AiService.AiServiceClient>(o =>
-    o.Address = new Uri(builder.Configuration["Grpc:Peers:Ai"] ?? "http://localhost:6005"));
+    o.Address = new Uri(builder.Configuration["Grpc:Peers:Ai"] ?? "http://localhost:6005"))
+    .AddInterceptor<InternalTokenClientInterceptor>();
 builder.Services.AddScoped<INotificationPublisher, GrpcNotificationPublisher>();
 
 builder.WebHost.ConfigureKestrel(options =>

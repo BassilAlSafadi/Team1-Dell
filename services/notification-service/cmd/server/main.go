@@ -57,7 +57,7 @@ func main() {
 		}
 	}()
 
-	grpcServer := grpcserver.New(database, redisClient)
+	grpcServer := grpcserver.New(database, redisClient, cfg.InternalServiceToken)
 	grpcListener, err := net.Listen("tcp", ":"+cfg.GRPCPort)
 	if err != nil {
 		log.Fatalf("failed to listen on gRPC port %s: %v", cfg.GRPCPort, err)

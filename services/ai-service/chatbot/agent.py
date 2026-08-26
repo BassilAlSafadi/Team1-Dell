@@ -37,6 +37,12 @@ def build_llm(model: str | None = None, api_key: str | None = None) -> ChatGoogl
         model=model or config.MODEL_FALLBACK_CHAIN[0],
         api_key=api_key or config.GEMINI_API_KEY,
         temperature=0.3,
+        # gemini_keys.call_with_gemini_fallback() is the retry strategy for this app — it
+        # already retries across every model/key combination the instant a call fails. The
+        # SDK's own default (6 retries with exponential backoff, up to ~30s) would retry the
+        # *same* already-failing model/key first, adding up to half a minute of latency
+        # before our much faster fallback ever gets a turn.
+        max_retries=0,
     )
     return llm.bind_tools(ALL_TOOLS)
 

@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -34,8 +35,17 @@ type Config struct {
 
 	RedisURL string
 
+	// Shared secret presented to backend gRPC servers so they can tell a mesh peer from an
+	// arbitrary caller. Required: without it every backend gRPC call is rejected.
+	InternalServiceToken string
+
 	RateLimitRPS   int
 	RateLimitBurst int
+
+	// TrustedProxies are the CIDR ranges whose X-Forwarded-For header the rate limiter may
+	// believe. Empty (the default) means trust nothing and key on the peer address, which is
+	// the correct setting when the gateway is itself the edge.
+	TrustedProxies []*net.IPNet
 }
 
 // Load reads .env (if present — Docker/CI supply real env vars instead) and
@@ -65,9 +75,17 @@ func Load() (*Config, error) {
 
 		RedisURL: os.Getenv("REDIS_URL"),
 
+		InternalServiceToken: os.Getenv("INTERNAL_SERVICE_TOKEN"),
+
 		RateLimitRPS:   getEnvInt("RATE_LIMIT_RPS", 20),
 		RateLimitBurst: getEnvInt("RATE_LIMIT_BURST", 40),
 	}
+
+	trustedProxies, err := parseCIDRs(os.Getenv("TRUSTED_PROXIES"))
+	if err != nil {
+		return nil, fmt.Errorf("TRUSTED_PROXIES: %w", err)
+	}
+	cfg.TrustedProxies = trustedProxies
 
 	required := map[string]string{
 		"JWT_SIGNING_KEY":        cfg.JWTSigningKey,
@@ -82,6 +100,10 @@ func Load() (*Config, error) {
 		"NOTIFICATION_REST_ADDR": cfg.NotificationRESTAddr,
 		"MARKETPLACE_REST_ADDR":  cfg.MarketplaceRESTAddr,
 		"REDIS_URL":              cfg.RedisURL,
+		"INTERNAL_SERVICE_TOKEN": cfg.InternalServiceToken,
+		// Required so a deploy that forgets it fails loudly instead of silently serving
+		// Access-Control-Allow-Origin: * to every origin on the internet.
+		"CORS_ORIGINS": strings.Join(cfg.CORSOrigins, ","),
 	}
 	var missing []string
 	for name, val := range required {
@@ -116,6 +138,29 @@ func getEnvInt(key string, fallback int) int {
 		return fallback
 	}
 	return n
+}
+
+// parseCIDRs accepts a comma-separated list of CIDR blocks or bare IPs.
+func parseCIDRs(csv string) ([]*net.IPNet, error) {
+	var out []*net.IPNet
+	for _, entry := range splitAndTrim(csv) {
+		if _, network, err := net.ParseCIDR(entry); err == nil {
+			out = append(out, network)
+			continue
+		}
+
+		ip := net.ParseIP(entry)
+		if ip == nil {
+			return nil, fmt.Errorf("%q is not a valid CIDR block or IP address", entry)
+		}
+
+		bits := 32
+		if ip.To4() == nil {
+			bits = 128
+		}
+		out = append(out, &net.IPNet{IP: ip, Mask: net.CIDRMask(bits, bits)})
+	}
+	return out, nil
 }
 
 func splitAndTrim(csv string) []string {

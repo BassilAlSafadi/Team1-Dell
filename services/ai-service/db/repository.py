@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from bson import ObjectId
+from bson.errors import InvalidId
 
 from db.client import (
     CLASSIFICATIONS_COLLECTION,
@@ -39,8 +40,24 @@ def create_thread(user_id: str, title: str | None = None) -> str:
 
 def get_thread(thread_id: str) -> dict | None:
     db = get_database()
-    doc = db[THREADS_COLLECTION].find_one({"_id": ObjectId(thread_id)})
+    try:
+        object_id = ObjectId(thread_id)
+    except (InvalidId, TypeError):
+        # A malformed id is "no such thread", not a crash.
+        return None
+    doc = db[THREADS_COLLECTION].find_one({"_id": object_id})
     return _stringify_id(doc)
+
+
+def thread_belongs_to(thread_id: str, user_id: str) -> bool:
+    """Whether ``thread_id`` exists and is owned by ``user_id``.
+
+    Chat history was previously loaded by thread id alone, with the owner recorded at creation
+    and then never consulted, so passing someone else's threadId replayed their whole
+    conversation into the model's context and appended to their thread.
+    """
+    thread = get_thread(thread_id)
+    return thread is not None and thread.get("user_id") == user_id
 
 
 def list_threads_for_user(user_id: str) -> list[dict]:

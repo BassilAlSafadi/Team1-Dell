@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import ChatbotWidget from '../components/ChatbotWidget'
 import { api, ApiError } from '../lib/api'
@@ -56,6 +57,10 @@ type VendorProfileResponse = {
 }
 
 type OfferStatus = 'idle' | 'sending' | 'sent' | 'error'
+type MessageStatus = 'idle' | 'loading' | 'error'
+type ConversationDto = { _id: string }
+
+type BusinessInfo = { companyName: string; userId: string }
 
 function humanize(value: string): string {
   return value
@@ -79,15 +84,15 @@ function formatRelativeTime(iso: string): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-async function fetchBusinessNames(corporateIds: string[]): Promise<Record<string, string>> {
+async function fetchBusinessInfo(corporateIds: string[]): Promise<Record<string, BusinessInfo>> {
   const unique = Array.from(new Set(corporateIds))
   const entries = await Promise.all(
     unique.map(async (id) => {
       try {
         const profile = await api.get<CorporateProfileResponse>(`/api/corporate-profiles/${id}`)
-        return [id, profile.companyName] as const
+        return [id, { companyName: profile.companyName, userId: profile.userId }] as const
       } catch {
-        return [id, 'Unknown'] as const
+        return [id, { companyName: 'Unknown', userId: '' }] as const
       }
     }),
   )
@@ -95,13 +100,15 @@ async function fetchBusinessNames(corporateIds: string[]): Promise<Record<string
 }
 
 function VendorRequestsPage() {
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [listings, setListings] = useState<ListingResponse[]>([])
-  const [businessNames, setBusinessNames] = useState<Record<string, string>>({})
+  const [businessInfo, setBusinessInfo] = useState<Record<string, BusinessInfo>>({})
   const [vendorId, setVendorId] = useState<string | null>(null)
   const [vendorProfileMissing, setVendorProfileMissing] = useState(false)
   const [offerStatus, setOfferStatus] = useState<Record<string, OfferStatus>>({})
+  const [messageStatus, setMessageStatus] = useState<Record<string, MessageStatus>>({})
 
   useEffect(() => {
     let cancelled = false
@@ -135,8 +142,8 @@ function VendorRequestsPage() {
         const corporateIds = listingsRes
           .map((listing) => listing.ownerCorporateId)
           .filter((id): id is string => Boolean(id))
-        const names = await fetchBusinessNames(corporateIds)
-        if (!cancelled) setBusinessNames(names)
+        const info = await fetchBusinessInfo(corporateIds)
+        if (!cancelled) setBusinessInfo(info)
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof ApiError ? err.message : 'Failed to load requests.')
@@ -156,9 +163,10 @@ function VendorRequestsPage() {
     if (!vendorId || !listing.ownerCorporateId) return
     setOfferStatus((prev) => ({ ...prev, [listing.listingId]: 'sending' }))
     try {
+      // buyerId is no longer sent: the server derives it from the signed-in user's own vendor
+      // account. Accepting it from the client let anyone make an offer as anyone.
       await api.post('/api/offers', {
         listingId: listing.listingId,
-        buyerId: vendorId,
         sellerId: listing.ownerCorporateId,
         offeredAmount: listing.expectedAmount ?? 0,
         currency: listing.currency ?? 'EGP',
@@ -166,6 +174,25 @@ function VendorRequestsPage() {
       setOfferStatus((prev) => ({ ...prev, [listing.listingId]: 'sent' }))
     } catch {
       setOfferStatus((prev) => ({ ...prev, [listing.listingId]: 'error' }))
+    }
+  }
+
+  async function handleMessage(listing: ListingResponse) {
+    const ownerUserId = listing.ownerCorporateId ? businessInfo[listing.ownerCorporateId]?.userId : undefined
+    if (!ownerUserId) return
+    setMessageStatus((prev) => ({ ...prev, [listing.listingId]: 'loading' }))
+    try {
+      // I'm the vendor initiating contact here — pass roles explicitly since the endpoint's
+      // defaults assume the caller is the vendor and would mislabel the other participant.
+      const conversation = await api.post<ConversationDto>('/api/conversations', {
+        participantUserId: ownerUserId,
+        participantRole: 'vendor',
+        otherParticipantRole: 'corporate',
+        listingId: listing.listingId,
+      })
+      navigate('/messages', { state: { conversationId: conversation._id } })
+    } catch {
+      setMessageStatus((prev) => ({ ...prev, [listing.listingId]: 'error' }))
     }
   }
 
@@ -202,8 +229,12 @@ function VendorRequestsPage() {
                     ? "This business hasn't completed their profile yet"
                     : undefined
                 const business = listing.ownerCorporateId
-                  ? businessNames[listing.ownerCorporateId] ?? 'Unknown'
+                  ? businessInfo[listing.ownerCorporateId]?.companyName ?? 'Unknown'
                   : 'Unknown'
+                const ownerUserId = listing.ownerCorporateId
+                  ? businessInfo[listing.ownerCorporateId]?.userId
+                  : undefined
+                const msgStatus = messageStatus[listing.listingId] ?? 'idle'
 
                 return (
                   <article className="request-card" key={listing.listingId}>
@@ -223,21 +254,36 @@ function VendorRequestsPage() {
                     </p>
                     <p className="request-posted">Posted {formatRelativeTime(listing.createdAt)}</p>
 
-                    <button
-                      type="button"
-                      className="btn-primary"
-                      disabled={status === 'sending' || status === 'sent' || Boolean(disabledReason)}
-                      title={disabledReason}
-                      onClick={() => handleAccept(listing)}
-                    >
-                      {status === 'sent'
-                        ? 'Offer Sent'
-                        : status === 'sending'
-                          ? 'Sending…'
-                          : status === 'error'
+                    <div className="request-card-actions">
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        disabled={status === 'sending' || status === 'sent' || Boolean(disabledReason)}
+                        title={disabledReason}
+                        onClick={() => handleAccept(listing)}
+                      >
+                        {status === 'sent'
+                          ? 'Offer Sent'
+                          : status === 'sending'
+                            ? 'Sending…'
+                            : status === 'error'
+                              ? 'Failed — Retry'
+                              : 'Accept Request'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        disabled={msgStatus === 'loading' || !ownerUserId}
+                        title={!ownerUserId ? "This business hasn't completed their profile yet" : undefined}
+                        onClick={() => handleMessage(listing)}
+                      >
+                        {msgStatus === 'loading'
+                          ? 'Opening…'
+                          : msgStatus === 'error'
                             ? 'Failed — Retry'
-                            : 'Accept Request'}
-                    </button>
+                            : 'Message'}
+                      </button>
+                    </div>
                   </article>
                 )
               })}

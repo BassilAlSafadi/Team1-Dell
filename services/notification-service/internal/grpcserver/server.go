@@ -69,8 +69,10 @@ func (s *notificationServer) CreateNotification(ctx context.Context, req *notifi
 // implementation plus the standard health service, marked SERVING immediately
 // since there's no external dependency (beyond Mongo, already connected by the
 // time this is called) that would make it report otherwise.
-func New(db *mongo.Database, redisClient *redis.Client) *grpc.Server {
-	srv := grpc.NewServer()
+func New(db *mongo.Database, redisClient *redis.Client, internalToken string) *grpc.Server {
+	srv := grpc.NewServer(
+		grpc.UnaryInterceptor(InternalAuthInterceptor(internalToken)),
+	)
 
 	notificationv1.RegisterNotificationServiceServer(srv, &notificationServer{
 		collection: db.Collection("notifications"),

@@ -610,6 +610,74 @@ func (x *ChatResponse) GetThreadId() string {
 	return ""
 }
 
+type ChatChunk struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TextDelta     string                 `protobuf:"bytes,1,opt,name=text_delta,json=textDelta,proto3" json:"text_delta,omitempty"`
+	ThreadId      string                 `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	Done          bool                   `protobuf:"varint,3,opt,name=done,proto3" json:"done,omitempty"`
+	Reset_        bool                   `protobuf:"varint,4,opt,name=reset,proto3" json:"reset,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChatChunk) Reset() {
+	*x = ChatChunk{}
+	mi := &file_ai_v1_ai_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChatChunk) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChatChunk) ProtoMessage() {}
+
+func (x *ChatChunk) ProtoReflect() protoreflect.Message {
+	mi := &file_ai_v1_ai_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChatChunk.ProtoReflect.Descriptor instead.
+func (*ChatChunk) Descriptor() ([]byte, []int) {
+	return file_ai_v1_ai_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ChatChunk) GetTextDelta() string {
+	if x != nil {
+		return x.TextDelta
+	}
+	return ""
+}
+
+func (x *ChatChunk) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
+	}
+	return ""
+}
+
+func (x *ChatChunk) GetDone() bool {
+	if x != nil {
+		return x.Done
+	}
+	return false
+}
+
+func (x *ChatChunk) GetReset_() bool {
+	if x != nil {
+		return x.Reset_
+	}
+	return false
+}
+
 var File_ai_v1_ai_proto protoreflect.FileDescriptor
 
 const file_ai_v1_ai_proto_rawDesc = "" +
@@ -676,11 +744,19 @@ const file_ai_v1_ai_proto_rawDesc = "" +
 	"_thread_id\"A\n" +
 	"\fChatResponse\x12\x14\n" +
 	"\x05reply\x18\x01 \x01(\tR\x05reply\x12\x1b\n" +
-	"\tthread_id\x18\x02 \x01(\tR\bthreadId2\xe0\x01\n" +
+	"\tthread_id\x18\x02 \x01(\tR\bthreadId\"q\n" +
+	"\tChatChunk\x12\x1d\n" +
+	"\n" +
+	"text_delta\x18\x01 \x01(\tR\ttextDelta\x12\x1b\n" +
+	"\tthread_id\x18\x02 \x01(\tR\bthreadId\x12\x12\n" +
+	"\x04done\x18\x03 \x01(\bR\x04done\x12\x14\n" +
+	"\x05reset\x18\x04 \x01(\bR\x05reset2\x96\x02\n" +
 	"\tAiService\x12J\n" +
 	"\rClassifyWaste\x12\x1b.ai.v1.ClassifyWasteRequest\x1a\x1c.ai.v1.ClassifyWasteResponse\x12V\n" +
 	"\x11GetRecommendation\x12\x1f.ai.v1.GetRecommendationRequest\x1a .ai.v1.GetRecommendationResponse\x12/\n" +
-	"\x04Chat\x12\x12.ai.v1.ChatRequest\x1a\x13.ai.v1.ChatResponseB2Z0notification-service/internal/grpcgen/ai/v1;aiv1b\x06proto3"
+	"\x04Chat\x12\x12.ai.v1.ChatRequest\x1a\x13.ai.v1.ChatResponse\x124\n" +
+	"\n" +
+	"ChatStream\x12\x12.ai.v1.ChatRequest\x1a\x10.ai.v1.ChatChunk0\x01B2Z0notification-service/internal/grpcgen/ai/v1;aiv1b\x06proto3"
 
 var (
 	file_ai_v1_ai_proto_rawDescOnce sync.Once
@@ -694,7 +770,7 @@ func file_ai_v1_ai_proto_rawDescGZIP() []byte {
 	return file_ai_v1_ai_proto_rawDescData
 }
 
-var file_ai_v1_ai_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_ai_v1_ai_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_ai_v1_ai_proto_goTypes = []any{
 	(*ClassifyWasteRequest)(nil),      // 0: ai.v1.ClassifyWasteRequest
 	(*DetectedItem)(nil),              // 1: ai.v1.DetectedItem
@@ -705,23 +781,26 @@ var file_ai_v1_ai_proto_goTypes = []any{
 	(*GetRecommendationResponse)(nil), // 6: ai.v1.GetRecommendationResponse
 	(*ChatRequest)(nil),               // 7: ai.v1.ChatRequest
 	(*ChatResponse)(nil),              // 8: ai.v1.ChatResponse
-	nil,                               // 9: ai.v1.ClassifyWasteResponse.VendorsByCategoryEntry
-	(*timestamppb.Timestamp)(nil),     // 10: google.protobuf.Timestamp
+	(*ChatChunk)(nil),                 // 9: ai.v1.ChatChunk
+	nil,                               // 10: ai.v1.ClassifyWasteResponse.VendorsByCategoryEntry
+	(*timestamppb.Timestamp)(nil),     // 11: google.protobuf.Timestamp
 }
 var file_ai_v1_ai_proto_depIdxs = []int32{
 	2,  // 0: ai.v1.VendorList.vendors:type_name -> ai.v1.Vendor
 	1,  // 1: ai.v1.ClassifyWasteResponse.items:type_name -> ai.v1.DetectedItem
-	9,  // 2: ai.v1.ClassifyWasteResponse.vendors_by_category:type_name -> ai.v1.ClassifyWasteResponse.VendorsByCategoryEntry
-	10, // 3: ai.v1.GetRecommendationResponse.generated_at:type_name -> google.protobuf.Timestamp
+	10, // 2: ai.v1.ClassifyWasteResponse.vendors_by_category:type_name -> ai.v1.ClassifyWasteResponse.VendorsByCategoryEntry
+	11, // 3: ai.v1.GetRecommendationResponse.generated_at:type_name -> google.protobuf.Timestamp
 	3,  // 4: ai.v1.ClassifyWasteResponse.VendorsByCategoryEntry.value:type_name -> ai.v1.VendorList
 	0,  // 5: ai.v1.AiService.ClassifyWaste:input_type -> ai.v1.ClassifyWasteRequest
 	5,  // 6: ai.v1.AiService.GetRecommendation:input_type -> ai.v1.GetRecommendationRequest
 	7,  // 7: ai.v1.AiService.Chat:input_type -> ai.v1.ChatRequest
-	4,  // 8: ai.v1.AiService.ClassifyWaste:output_type -> ai.v1.ClassifyWasteResponse
-	6,  // 9: ai.v1.AiService.GetRecommendation:output_type -> ai.v1.GetRecommendationResponse
-	8,  // 10: ai.v1.AiService.Chat:output_type -> ai.v1.ChatResponse
-	8,  // [8:11] is the sub-list for method output_type
-	5,  // [5:8] is the sub-list for method input_type
+	7,  // 8: ai.v1.AiService.ChatStream:input_type -> ai.v1.ChatRequest
+	4,  // 9: ai.v1.AiService.ClassifyWaste:output_type -> ai.v1.ClassifyWasteResponse
+	6,  // 10: ai.v1.AiService.GetRecommendation:output_type -> ai.v1.GetRecommendationResponse
+	8,  // 11: ai.v1.AiService.Chat:output_type -> ai.v1.ChatResponse
+	9,  // 12: ai.v1.AiService.ChatStream:output_type -> ai.v1.ChatChunk
+	9,  // [9:13] is the sub-list for method output_type
+	5,  // [5:9] is the sub-list for method input_type
 	5,  // [5:5] is the sub-list for extension type_name
 	5,  // [5:5] is the sub-list for extension extendee
 	0,  // [0:5] is the sub-list for field type_name
@@ -741,7 +820,7 @@ func file_ai_v1_ai_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ai_v1_ai_proto_rawDesc), len(file_ai_v1_ai_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

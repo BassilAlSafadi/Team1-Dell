@@ -8,7 +8,9 @@ import FindVendorsPage from './pages/FindVendorsPage'
 import TransactionsPage from './pages/TransactionsPage'
 import VendorDashboardPage from './pages/VendorDashboardPage'
 import VendorRequestsPage from './pages/VendorRequestsPage'
+import FindBusinessesPage from './pages/FindBusinessesPage'
 import VendorTransactionsPage from './pages/VendorTransactionsPage'
+import MessagesPage from './pages/MessagesPage'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
@@ -23,7 +25,9 @@ function App() {
       <Route path="/transactions" element={<ProtectedRoute><TransactionsPage /></ProtectedRoute>} />
       <Route path="/vendor-dashboard" element={<ProtectedRoute><VendorDashboardPage /></ProtectedRoute>} />
       <Route path="/vendor-requests" element={<ProtectedRoute><VendorRequestsPage /></ProtectedRoute>} />
+      <Route path="/find-businesses" element={<ProtectedRoute><FindBusinessesPage /></ProtectedRoute>} />
       <Route path="/vendor-transactions" element={<ProtectedRoute><VendorTransactionsPage /></ProtectedRoute>} />
+      <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
     </Routes>
   )
 }

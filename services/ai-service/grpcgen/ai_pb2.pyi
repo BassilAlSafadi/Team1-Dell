@@ -114,3 +114,15 @@ class ChatResponse(_message.Message):
     reply: str
     thread_id: str
     def __init__(self, reply: _Optional[str] = ..., thread_id: _Optional[str] = ...) -> None: ...
+
+class ChatChunk(_message.Message):
+    __slots__ = ("text_delta", "thread_id", "done", "reset")
+    TEXT_DELTA_FIELD_NUMBER: _ClassVar[int]
+    THREAD_ID_FIELD_NUMBER: _ClassVar[int]
+    DONE_FIELD_NUMBER: _ClassVar[int]
+    RESET_FIELD_NUMBER: _ClassVar[int]
+    text_delta: str
+    thread_id: str
+    done: bool
+    reset: bool
+    def __init__(self, text_delta: _Optional[str] = ..., thread_id: _Optional[str] = ..., done: bool = ..., reset: bool = ...) -> None: ...

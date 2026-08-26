@@ -1,13 +1,15 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TransactionService.Api.Contracts;
+using TransactionService.Api.Identity;
 using TransactionService.Api.Services;
 
 namespace TransactionService.Api.Controllers;
 
-// buyer_id/seller_id identify Marketplace Service VENDOR/CORPORATE accounts, a different id
-// space from the Auth Service user in the JWT — marketplace-service (not yet built) is
-// responsible for checking that the caller controls the buyer/seller account it names here.
+// buyer_id/seller_id identify Marketplace Service VENDOR/CORPORATE accounts, a different id space
+// from the Auth Service user in the JWT. This controller no longer accepts either from the client:
+// the buyer is derived from the caller's own marketplace accounts, and every mutation checks that
+// the caller controls the side of the offer it is acting on (see OfferService).
 [ApiController]
 [Authorize]
 [Route("api/offers")]
@@ -24,49 +26,47 @@ public class OffersController : ControllerBase
     public async Task<ActionResult<OfferResponse>> Create(CreateOfferRequest request, CancellationToken ct)
     {
         var offer = await _offerService.CreateAsync(
-            request.ListingId, request.BuyerId, request.SellerId, request.OfferedAmount, request.Currency, request.Message, request.ExpiresAt, ct);
+            request.ListingId, request.SellerId, request.OfferedAmount, request.Currency,
+            request.Message, request.ExpiresAt, this.CurrentUserId(), ct);
         return Ok(offer);
     }
 
     [HttpGet("{offerId:guid}")]
     public async Task<ActionResult<OfferResponse>> Get(Guid offerId, CancellationToken ct)
     {
-        var offer = await _offerService.GetAsync(offerId, ct);
+        var offer = await _offerService.GetAsync(offerId, this.CurrentUserId(), ct);
         return Ok(offer);
     }
 
-    [HttpGet("buyer/{buyerId:guid}")]
-    public async Task<ActionResult<IReadOnlyList<OfferResponse>>> ListForBuyer(Guid buyerId, CancellationToken ct)
+    /// <summary>The caller's own offers. Replaces GET buyer/{buyerId} and GET seller/{sellerId},
+    /// which took the account id from the URL and so allowed enumerating anyone's offers.</summary>
+    [HttpGet("mine")]
+    public async Task<ActionResult<IReadOnlyList<OfferResponse>>> ListMine(
+        [FromQuery] string role = "ANY", [FromQuery] int page = 1, [FromQuery] int pageSize = 20,
+        CancellationToken ct = default)
     {
-        var offers = await _offerService.ListForBuyerAsync(buyerId, ct);
-        return Ok(offers);
-    }
-
-    [HttpGet("seller/{sellerId:guid}")]
-    public async Task<ActionResult<IReadOnlyList<OfferResponse>>> ListForSeller(Guid sellerId, CancellationToken ct)
-    {
-        var offers = await _offerService.ListForSellerAsync(sellerId, ct);
+        var offers = await _offerService.ListMineAsync(this.CurrentUserId(), role, page, pageSize, ct);
         return Ok(offers);
     }
 
     [HttpPost("{offerId:guid}/accept")]
     public async Task<ActionResult<DealResponse>> Accept(Guid offerId, CancellationToken ct)
     {
-        var deal = await _offerService.AcceptAsync(offerId, ct);
+        var deal = await _offerService.AcceptAsync(offerId, this.CurrentUserId(), ct);
         return Ok(deal);
     }
 
     [HttpPost("{offerId:guid}/reject")]
     public async Task<ActionResult<OfferResponse>> Reject(Guid offerId, CancellationToken ct)
     {
-        var offer = await _offerService.RejectAsync(offerId, ct);
+        var offer = await _offerService.RejectAsync(offerId, this.CurrentUserId(), ct);
         return Ok(offer);
     }
 
     [HttpPost("{offerId:guid}/withdraw")]
     public async Task<ActionResult<OfferResponse>> Withdraw(Guid offerId, CancellationToken ct)
     {
-        var offer = await _offerService.WithdrawAsync(offerId, ct);
+        var offer = await _offerService.WithdrawAsync(offerId, this.CurrentUserId(), ct);
         return Ok(offer);
     }
 }

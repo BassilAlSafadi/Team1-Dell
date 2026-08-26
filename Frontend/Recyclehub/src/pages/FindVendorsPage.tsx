@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import ChatbotWidget from '../components/ChatbotWidget'
 import { api, ApiError } from '../lib/api'
@@ -31,7 +32,9 @@ type AuthVendorProfile = {
 
 type RatingInfo = { averageRating: number; reviewCount: number } | null
 
-type ContactState = 'idle' | 'loading' | 'done' | 'error'
+type ContactState = 'idle' | 'loading' | 'error'
+
+type ConversationDto = { _id: string }
 
 function vendorMaterials(vendor: VendorProfileResponse): string[] {
   if (!vendor.categoryPreference) return []
@@ -42,6 +45,7 @@ function vendorMaterials(vendor: VendorProfileResponse): string[] {
 }
 
 function FindVendorsPage() {
+  const navigate = useNavigate()
   const [vendors, setVendors] = useState<VendorProfileResponse[]>([])
   const [ratings, setRatings] = useState<Record<string, RatingInfo>>({})
   const [isLoading, setIsLoading] = useState(true)
@@ -95,8 +99,14 @@ function FindVendorsPage() {
       return next
     })
     try {
-      await api.post('/api/conversations', { participantUserId: vendor.userId })
-      setContactState((prev) => ({ ...prev, [vendor.userId]: 'done' }))
+      // I'm the business owner initiating contact here, so tag roles explicitly rather than
+      // relying on the endpoint's defaults (which assume the caller is the vendor).
+      const conversation = await api.post<ConversationDto>('/api/conversations', {
+        participantUserId: vendor.userId,
+        participantRole: 'corporate',
+        otherParticipantRole: 'vendor',
+      })
+      navigate('/messages', { state: { conversationId: conversation._id } })
     } catch (err) {
       setContactState((prev) => ({ ...prev, [vendor.userId]: 'error' }))
       setContactError((prev) => ({
@@ -150,14 +160,10 @@ function FindVendorsPage() {
                   <button
                     type="button"
                     className="btn-secondary"
-                    disabled={state === 'loading' || state === 'done'}
+                    disabled={state === 'loading'}
                     onClick={() => handleContact(vendor)}
                   >
-                    {state === 'loading'
-                      ? 'Contacting…'
-                      : state === 'done'
-                        ? 'Contacted'
-                        : 'Contact Vendor'}
+                    {state === 'loading' ? 'Opening…' : 'Message Vendor'}
                   </button>
                   {state === 'error' && (
                     <p className="vendor-contact-error">{contactError[vendor.userId]}</p>

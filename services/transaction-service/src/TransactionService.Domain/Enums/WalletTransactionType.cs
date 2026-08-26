@@ -5,7 +5,10 @@ public enum WalletTransactionType
     TopUp,
     Payment,
     Refund,
-    Withdrawal
+    Withdrawal,
+
+    /// <summary>Escrow released to the seller when a deal completes.</summary>
+    Payout
 }
 
 public static class WalletTransactionTypeExtensions
@@ -16,6 +19,7 @@ public static class WalletTransactionTypeExtensions
         WalletTransactionType.Payment => "PAYMENT",
         WalletTransactionType.Refund => "REFUND",
         WalletTransactionType.Withdrawal => "WITHDRAWAL",
+        WalletTransactionType.Payout => "PAYOUT",
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
     };
 
@@ -25,6 +29,7 @@ public static class WalletTransactionTypeExtensions
         "PAYMENT" => WalletTransactionType.Payment,
         "REFUND" => WalletTransactionType.Refund,
         "WITHDRAWAL" => WalletTransactionType.Withdrawal,
+        "PAYOUT" => WalletTransactionType.Payout,
         _ => throw new ArgumentOutOfRangeException(nameof(value), value, null)
     };
 }

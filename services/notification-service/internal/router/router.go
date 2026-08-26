@@ -20,7 +20,9 @@ func New(cfg *config.Config, db *mongo.Database, redisClient *redis.Client) http
 	r.Use(chimiddleware.Logger)
 	r.Use(chimiddleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   corsOrigins(cfg.CORSOrigins),
+		// No wildcard fallback — an unconfigured CORS_ORIGINS must not silently allow every
+		// origin. An empty list means no cross-origin browser access, which is the safe default.
+		AllowedOrigins:   cfg.CORSOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PATCH", "DELETE"},
 		AllowedHeaders:   []string{"Authorization", "Content-Type"},
 		AllowCredentials: true,
@@ -32,9 +34,13 @@ func New(cfg *config.Config, db *mongo.Database, redisClient *redis.Client) http
 	notificationHandler := handlers.NewNotificationHandler(db, redisClient)
 
 	r.Route("/api/notifications", func(r chi.Router) {
+		// Writing a notification names an arbitrary recipient, so it is a backend-only
+		// operation gated on the mesh token — never on an end user's bearer token. Reads and
+		// read-state changes stay user-scoped.
+		r.With(middleware.RequireInternal(cfg)).Post("/", notificationHandler.Create)
+
 		r.Use(middleware.RequireAuth(cfg))
 
-		r.Post("/", notificationHandler.Create)
 		r.Get("/", notificationHandler.List)
 		r.Get("/unread-count", notificationHandler.UnreadCount)
 		r.Post("/read-all", notificationHandler.MarkAllRead)
@@ -42,11 +48,4 @@ func New(cfg *config.Config, db *mongo.Database, redisClient *redis.Client) http
 	})
 
 	return r
-}
-
-func corsOrigins(origins []string) []string {
-	if len(origins) == 0 {
-		return []string{"*"}
-	}
-	return origins
 }

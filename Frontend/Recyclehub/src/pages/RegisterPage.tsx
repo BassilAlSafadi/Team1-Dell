@@ -98,7 +98,7 @@ const roles: {
   },
 ]
 
-type Step = 'form' | 'verify'
+type Step = 'form' | 'onboarding' | 'verify'
 
 type FormState = {
   email: string
@@ -138,6 +138,7 @@ function RegisterPage() {
   const [isRegistering, setIsRegistering] = useState(false)
   const [isVerifying, setIsVerifying] = useState(false)
   const [isResending, setIsResending] = useState(false)
+  const [isOnboarding, setIsOnboarding] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [resendMessage, setResendMessage] = useState<string | null>(null)
 
@@ -206,6 +207,46 @@ function RegisterPage() {
     }
   }
 
+  /** After a fresh Google signup: the account exists (role USER) but has no vendor/corporate
+   * profile yet, since Google auth never asked for those details — collect them here instead. */
+  const handleGoogleSignedUp = () => {
+    setError(null)
+    setStep('onboarding')
+  }
+
+  const handleOnboardingSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!role) return
+    setError(null)
+    setIsOnboarding(true)
+    try {
+      if (role === 'vendor') {
+        await api.post('/api/vendor-profiles', {
+          vendorName: form.vendorName,
+          categoryPreference: form.category || undefined,
+          fulfillmentMethod: form.fulfillment || undefined,
+          operatingHours: form.operatingHours || undefined,
+          locationText: form.location || undefined,
+          minimumAmount: form.minimumAmount ? Number(form.minimumAmount) : undefined,
+        })
+      } else {
+        await api.post('/api/corporate-profiles', {
+          companyName: form.orgName,
+        })
+      }
+      finishAndRedirect()
+    } catch (err) {
+      // A 409 (profile already exists) is not fatal — the account is still in a good state.
+      if (err instanceof ApiError && err.status === 409) {
+        finishAndRedirect()
+        return
+      }
+      setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.')
+    } finally {
+      setIsOnboarding(false)
+    }
+  }
+
   const handleResend = async () => {
     setError(null)
     setResendMessage(null)
@@ -219,6 +260,94 @@ function RegisterPage() {
       setIsResending(false)
     }
   }
+
+  // Shared between the manual signup form and the post-Google onboarding step — both collect
+  // the same vendor/business details, just at different points in the flow.
+  const renderRoleFields = () =>
+    role === 'vendor' ? (
+      <>
+        <label htmlFor="vendorName"> Vendor Name:</label>
+        <input
+          id="vendorName"
+          name="vendorName"
+          type="text"
+          value={form.vendorName}
+          onChange={updateField('vendorName')}
+          required
+        />
+
+        <label htmlFor="category">Category:</label>
+        <select id="category" name="category" value={form.category} onChange={updateField('category')}>
+          <option value="" disabled>
+            Select a category
+          </option>
+          <option value="plastic">Plastic</option>
+          <option value="metal">Metal</option>
+          <option value="paper">Paper &amp; cardboard</option>
+          <option value="glass">Glass</option>
+          <option value="electronics">Electronics</option>
+          <option value="organic">Organic</option>
+          <option value="mixed">Mixed / other</option>
+        </select>
+
+        <label htmlFor="taxCertificate">Tax card / certification (for verification):</label>
+        <input id="taxCertificate" name="taxCertificate" type="file" accept=".pdf,.jpg,.jpeg,.png" />
+
+        <label htmlFor="fulfillment">Drop off or delivery:</label>
+        <select id="fulfillment" name="fulfillment" value={form.fulfillment} onChange={updateField('fulfillment')}>
+          <option value="" disabled>
+            Select an option
+          </option>
+          <option value="pickup">Drop off</option>
+          <option value="delivery">Delivery</option>
+          <option value="both">Both</option>
+        </select>
+
+        <label htmlFor="operatingHours">Operating hours:</label>
+        <input
+          id="operatingHours"
+          name="operatingHours"
+          type="text"
+          placeholder="e.g. Mon–Fri, 9am–5pm"
+          value={form.operatingHours}
+          onChange={updateField('operatingHours')}
+        />
+
+        <label htmlFor="location">Location (address):</label>
+        <input
+          id="location"
+          name="location"
+          type="text"
+          autoComplete="street-address"
+          value={form.location}
+          onChange={updateField('location')}
+        />
+
+        <label htmlFor="minimumAmount">Minimum amount required:</label>
+        <input
+          id="minimumAmount"
+          name="minimumAmount"
+          type="number"
+          min="0"
+          step="0.01"
+          placeholder="e.g. 10"
+          value={form.minimumAmount}
+          onChange={updateField('minimumAmount')}
+        />
+      </>
+    ) : (
+      <>
+        <label htmlFor="orgName">Company name:</label>
+        <input
+          id="orgName"
+          name="orgName"
+          type="text"
+          value={form.orgName}
+          onChange={updateField('orgName')}
+          required
+        />
+      </>
+    )
 
   return (
     <div className="register-page">
@@ -274,18 +403,6 @@ function RegisterPage() {
               ))}
             </div>
 
-            <div className="auth-divider">
-              <span>or</span>
-            </div>
-
-            <GoogleSignInButton text="signup_with" onError={setError} />
-
-            {error && (
-              <p className="register-error" role="alert">
-                {error}
-              </p>
-            )}
-
             <p className="signup-hint">
               Already have an account? <Link to="/login">Log in</Link>
             </p>
@@ -312,109 +429,7 @@ function RegisterPage() {
               {step === 'form' ? (
                 <>
                   <form className="register-form" onSubmit={handleRegisterSubmit}>
-                    {selectedRole.id === 'vendor' ? (
-                      <>
-                        <label htmlFor="vendorName"> Vendor Name:</label>
-                        <input
-                          id="vendorName"
-                          name="vendorName"
-                          type="text"
-                          value={form.vendorName}
-                          onChange={updateField('vendorName')}
-                          required
-                        />
-
-                        <label htmlFor="category">Category:</label>
-                        <select
-                          id="category"
-                          name="category"
-                          value={form.category}
-                          onChange={updateField('category')}
-                        >
-                          <option value="" disabled>
-                            Select a category
-                          </option>
-                          <option value="plastic">Plastic</option>
-                          <option value="metal">Metal</option>
-                          <option value="paper">Paper &amp; cardboard</option>
-                          <option value="glass">Glass</option>
-                          <option value="electronics">Electronics</option>
-                          <option value="organic">Organic</option>
-                          <option value="mixed">Mixed / other</option>
-                        </select>
-
-                        <label htmlFor="taxCertificate">
-                          Tax card / certification (for verification):
-                        </label>
-                        <input
-                          id="taxCertificate"
-                          name="taxCertificate"
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg,.png"
-                        />
-
-                        <label htmlFor="fulfillment">Drop off or delivery:</label>
-                        <select
-                          id="fulfillment"
-                          name="fulfillment"
-                          value={form.fulfillment}
-                          onChange={updateField('fulfillment')}
-                        >
-                          <option value="" disabled>
-                            Select an option
-                          </option>
-                          <option value="pickup">Drop off</option>
-                          <option value="delivery">Delivery</option>
-                          <option value="both">Both</option>
-                        </select>
-
-                        <label htmlFor="operatingHours">Operating hours:</label>
-                        <input
-                          id="operatingHours"
-                          name="operatingHours"
-                          type="text"
-                          placeholder="e.g. Mon–Fri, 9am–5pm"
-                          value={form.operatingHours}
-                          onChange={updateField('operatingHours')}
-                        />
-
-                        <label htmlFor="location">Location (address):</label>
-                        <input
-                          id="location"
-                          name="location"
-                          type="text"
-                          autoComplete="street-address"
-                          value={form.location}
-                          onChange={updateField('location')}
-                        />
-
-                        <label htmlFor="minimumAmount">
-                          Minimum amount required:
-                        </label>
-                        <input
-                          id="minimumAmount"
-                          name="minimumAmount"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="e.g. 10"
-                          value={form.minimumAmount}
-                          onChange={updateField('minimumAmount')}
-                        />
-                      </>
-                    ) : (
-                      <>
-                        <label htmlFor="orgName">Company name:</label>
-                        <input
-                          id="orgName"
-                          name="orgName"
-                          type="text"
-                          value={form.orgName}
-                          onChange={updateField('orgName')}
-                          required
-                        />
-                      </>
-                    )}
+                    {renderRoleFields()}
 
                     <label htmlFor="email">Email:</label>
                     <input
@@ -427,7 +442,7 @@ function RegisterPage() {
                       required
                     />
 
-                    <label htmlFor="password">Password:</label>
+                    <label htmlFor="password">Password (min. 12 characters):</label>
                     <input
                       id="password"
                       name="password"
@@ -436,6 +451,7 @@ function RegisterPage() {
                       value={form.password}
                       onChange={updateField('password')}
                       required
+                      minLength={12}
                     />
 
                     {error && (
@@ -449,9 +465,36 @@ function RegisterPage() {
                     </button>
                   </form>
 
+                  <div className="auth-divider">
+                    <span>or</span>
+                  </div>
+
+                  <GoogleSignInButton text="signup_with" onError={setError} onSuccess={handleGoogleSignedUp} />
+
                   <p className="signup-hint">
                     Already have an account? <Link to="/login">Log in</Link>
                   </p>
+                </>
+              ) : step === 'onboarding' ? (
+                <>
+                  <form className="register-form" onSubmit={handleOnboardingSubmit}>
+                    <p className="verify-hint">
+                      You&apos;re signed in with Google — just a few details to finish setting up
+                      your {selectedRole.title.toLowerCase()} account.
+                    </p>
+
+                    {renderRoleFields()}
+
+                    {error && (
+                      <p className="register-error" role="alert">
+                        {error}
+                      </p>
+                    )}
+
+                    <button type="submit" className="register-submit" disabled={isOnboarding}>
+                      {isOnboarding ? 'Saving…' : 'Finish setup'}
+                    </button>
+                  </form>
                 </>
               ) : (
                 <>

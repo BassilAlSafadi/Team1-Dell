@@ -22,6 +22,7 @@ const (
 	AiService_ClassifyWaste_FullMethodName     = "/ai.v1.AiService/ClassifyWaste"
 	AiService_GetRecommendation_FullMethodName = "/ai.v1.AiService/GetRecommendation"
 	AiService_Chat_FullMethodName              = "/ai.v1.AiService/Chat"
+	AiService_ChatStream_FullMethodName        = "/ai.v1.AiService/ChatStream"
 )
 
 // AiServiceClient is the client API for AiService service.
@@ -35,6 +36,11 @@ type AiServiceClient interface {
 	ClassifyWaste(ctx context.Context, in *ClassifyWasteRequest, opts ...grpc.CallOption) (*ClassifyWasteResponse, error)
 	GetRecommendation(ctx context.Context, in *GetRecommendationRequest, opts ...grpc.CallOption) (*GetRecommendationResponse, error)
 	Chat(ctx context.Context, in *ChatRequest, opts ...grpc.CallOption) (*ChatResponse, error)
+	// Same request as Chat, but streams the reply as it's generated instead of waiting for
+	// the full turn. `reset` marks a Gemini fallback retry restarting the reply from
+	// scratch — any text_delta already received for this turn should be discarded and
+	// display should start over. `done` marks the final chunk (empty text_delta).
+	ChatStream(ctx context.Context, in *ChatRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ChatChunk], error)
 }
 
 type aiServiceClient struct {
@@ -75,6 +81,25 @@ func (c *aiServiceClient) Chat(ctx context.Context, in *ChatRequest, opts ...grp
 	return out, nil
 }
 
+func (c *aiServiceClient) ChatStream(ctx context.Context, in *ChatRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ChatChunk], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &AiService_ServiceDesc.Streams[0], AiService_ChatStream_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ChatRequest, ChatChunk]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type AiService_ChatStreamClient = grpc.ServerStreamingClient[ChatChunk]
+
 // AiServiceServer is the server API for AiService service.
 // All implementations should embed UnimplementedAiServiceServer
 // for forward compatibility.
@@ -86,6 +111,11 @@ type AiServiceServer interface {
 	ClassifyWaste(context.Context, *ClassifyWasteRequest) (*ClassifyWasteResponse, error)
 	GetRecommendation(context.Context, *GetRecommendationRequest) (*GetRecommendationResponse, error)
 	Chat(context.Context, *ChatRequest) (*ChatResponse, error)
+	// Same request as Chat, but streams the reply as it's generated instead of waiting for
+	// the full turn. `reset` marks a Gemini fallback retry restarting the reply from
+	// scratch — any text_delta already received for this turn should be discarded and
+	// display should start over. `done` marks the final chunk (empty text_delta).
+	ChatStream(*ChatRequest, grpc.ServerStreamingServer[ChatChunk]) error
 }
 
 // UnimplementedAiServiceServer should be embedded to have
@@ -103,6 +133,9 @@ func (UnimplementedAiServiceServer) GetRecommendation(context.Context, *GetRecom
 }
 func (UnimplementedAiServiceServer) Chat(context.Context, *ChatRequest) (*ChatResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Chat not implemented")
+}
+func (UnimplementedAiServiceServer) ChatStream(*ChatRequest, grpc.ServerStreamingServer[ChatChunk]) error {
+	return status.Error(codes.Unimplemented, "method ChatStream not implemented")
 }
 func (UnimplementedAiServiceServer) testEmbeddedByValue() {}
 
@@ -178,6 +211,17 @@ func _AiService_Chat_Handler(srv interface{}, ctx context.Context, dec func(inte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AiService_ChatStream_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ChatRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(AiServiceServer).ChatStream(m, &grpc.GenericServerStream[ChatRequest, ChatChunk]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type AiService_ChatStreamServer = grpc.ServerStreamingServer[ChatChunk]
+
 // AiService_ServiceDesc is the grpc.ServiceDesc for AiService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -198,6 +242,12 @@ var AiService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _AiService_Chat_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "ChatStream",
+			Handler:       _AiService_ChatStream_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "ai/v1/ai.proto",
 }

@@ -87,7 +87,13 @@
   color: var(--text);
 }
 
-.request-card .btn-primary {
+.request-card-actions {
+  display: flex;
+  gap: 10px;
   margin-top: 20px;
+}
+
+.request-card .btn-primary,
+.request-card .btn-secondary {
   align-self: flex-start;
 }

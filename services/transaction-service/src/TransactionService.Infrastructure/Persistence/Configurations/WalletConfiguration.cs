@@ -19,6 +19,13 @@ public class WalletConfiguration : IEntityTypeConfiguration<Wallet>
         builder.Property(w => w.CreatedAt).HasColumnName("created_at");
         builder.Property(w => w.UpdatedAt).HasColumnName("updated_at");
 
+        // Optimistic concurrency via Postgres' system xmin column. Balance mutations previously
+        // ran read -> check -> write with nothing making them atomic, so two concurrent
+        // withdrawals could both pass the balance check and both commit. With this token EF adds
+        // "WHERE xmin = @original" to the UPDATE, so the loser affects 0 rows and throws
+        // DbUpdateConcurrencyException instead of silently overwriting; WalletService retries.
+        builder.Property<uint>("Version").HasColumnName("xmin").IsRowVersion();
+
         builder.HasIndex(w => w.UserId).IsUnique().HasDatabaseName("uq_wallet_user_id");
 
         builder.HasMany(w => w.PaymentMethods)

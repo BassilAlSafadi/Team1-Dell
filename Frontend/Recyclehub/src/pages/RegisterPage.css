@@ -166,8 +166,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  max-width: 320px;
-  margin: 32px auto 0;
+  width: 100%;
+  margin-top: 24px;
   color: var(--text);
   font-size: 13px;
   text-transform: uppercase;
@@ -182,9 +182,8 @@
   }
 }
 
-.role-picker .google-signin-button {
-  max-width: 320px;
-  margin: 16px auto 0;
+.register-form-panel .google-signin-button {
+  margin-top: 16px;
 }
 
 .signup-hint {

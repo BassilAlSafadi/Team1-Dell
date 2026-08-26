@@ -27,6 +27,11 @@ public class WalletTransactionConfiguration : IEntityTypeConfiguration<WalletTra
         builder.HasIndex(wt => wt.WalletId).HasDatabaseName("idx_wallet_transaction_wallet");
         builder.HasIndex(wt => wt.PaymentMethodId).HasDatabaseName("idx_wallet_transaction_payment_method");
         builder.HasIndex(wt => wt.Status).HasDatabaseName("idx_wallet_transaction_status");
-        builder.HasIndex(wt => wt.DealId).IsUnique().HasDatabaseName("uq_wallet_transaction_deal_id");
+        // No plain unique index on DealId. Migration 0002 replaced it with three PARTIAL unique
+        // indexes (uq_wallet_transaction_deal_payment / _payout / _refund) so a deal can hold its
+        // payment and its later payout-or-refund while each stays unique per deal. EF cannot
+        // express a filtered index through HasIndex here, and declaring the old blanket unique
+        // index would misdescribe the database and scaffold a wrong migration if anyone ever
+        // generates one.
     }
 }

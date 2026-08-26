@@ -22,6 +22,13 @@ public class ExceptionHandlingMiddleware
         }
         catch (TransactionDomainException ex)
         {
+            // Once the response has started, headers and status are already on the wire and
+            // writing again throws InvalidOperationException, masking the original error.
+            if (context.Response.HasStarted)
+            {
+                throw;
+            }
+
             context.Response.StatusCode = (int)ex.StatusCode;
             await context.Response.WriteAsJsonAsync(new ProblemDetails
             {
@@ -32,6 +39,11 @@ public class ExceptionHandlingMiddleware
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unhandled exception");
+            if (context.Response.HasStarted)
+            {
+                throw;
+            }
+
             context.Response.StatusCode = StatusCodes.Status500InternalServerError;
             await context.Response.WriteAsJsonAsync(new ProblemDetails
             {

@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using TransactionService.Api.Contracts;
 using TransactionService.Api.Grpc;
+using TransactionService.Api.Identity;
 using TransactionService.Domain.Entities;
 using TransactionService.Domain.Enums;
 using TransactionService.Infrastructure.Caching;
@@ -16,6 +17,20 @@ public class DealService : IDealService
 
     // Typical flow: AGREED -> HANDOVER_PENDING -> COMPLETED, with CANCELLED/DISPUTED as
     // off-ramps. COMPLETED and CANCELLED are terminal.
+    private const int MaxPageSize = 100;
+
+    // Which party may drive which transition. Both parties can cancel or raise a dispute, but
+    // COMPLETED is the buyer confirming they received the goods — a seller who could self-award
+    // COMPLETED would be able to close a deal the buyer never accepted delivery on, and (once
+    // escrow releases on completion) pay themselves out unilaterally.
+    private static readonly Dictionary<DealStatus, DealParty> TransitionAuthority = new()
+    {
+        [DealStatus.HandoverPending] = DealParty.Either,
+        [DealStatus.Completed] = DealParty.Buyer,
+        [DealStatus.Cancelled] = DealParty.Either,
+        [DealStatus.Disputed] = DealParty.Either,
+    };
+
     private static readonly Dictionary<DealStatus, DealStatus[]> AllowedTransitions = new()
     {
         [DealStatus.Agreed] = [DealStatus.HandoverPending, DealStatus.Cancelled, DealStatus.Disputed],
@@ -28,19 +43,33 @@ public class DealService : IDealService
     private readonly TransactionDbContext _db;
     private readonly INotificationPublisher _notifications;
     private readonly IRedisCache _cache;
+    private readonly IMarketplaceAccountResolver _accounts;
+    private readonly IWalletService _wallets;
 
-    public DealService(TransactionDbContext db, INotificationPublisher notifications, IRedisCache cache)
+    public DealService(
+        TransactionDbContext db,
+        INotificationPublisher notifications,
+        IRedisCache cache,
+        IMarketplaceAccountResolver accounts,
+        IWalletService wallets)
     {
         _db = db;
         _notifications = notifications;
         _cache = cache;
+        _accounts = accounts;
+        _wallets = wallets;
     }
 
-    public async Task<DealResponse> GetAsync(Guid dealId, CancellationToken ct)
+    public async Task<DealResponse> GetAsync(Guid dealId, Guid actorUserId, CancellationToken ct)
     {
-        // Pure TTL-expiry cache-aside, no write-invalidation — lower-stakes staleness than
-        // wallet balance (see REDIS_INTEGRATION_PLAN.md §2).
-        var cacheKey = $"cache:transaction:deal:{dealId}";
+        // Authorize against the database row before consulting the cache: a cache hit must never
+        // become a way to read a deal you aren't party to.
+        var deal = await FindAsync(dealId, ct);
+        await RequirePartyAsync(deal, actorUserId, ct);
+
+        // Cache-aside with write-invalidation from TransitionAsync (a stale deal status gates
+        // payment, so it can't be left to TTL expiry alone).
+        var cacheKey = DealCacheKey(dealId);
         var cached = await _cache.GetStringAsync(cacheKey);
         if (cached is not null)
         {
@@ -51,7 +80,6 @@ public class DealService : IDealService
             }
         }
 
-        var deal = await FindAsync(dealId, ct);
         var response = ToResponse(deal);
 
         await _cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(response), DealCacheTtl);
@@ -59,19 +87,32 @@ public class DealService : IDealService
         return response;
     }
 
-    public async Task<IReadOnlyList<DealResponse>> ListForPartyAsync(Guid partyId, CancellationToken ct)
+    /// <summary>
+    /// Replaces ListForPartyAsync(partyId), which took the account id straight from the URL and
+    /// so returned any user's entire trading history to any caller. Scoped to the caller's own
+    /// marketplace accounts and paged.
+    /// </summary>
+    public async Task<IReadOnlyList<DealResponse>> ListMineAsync(Guid actorUserId, int page, int pageSize, CancellationToken ct)
     {
+        var caller = await RequireAccountsAsync(actorUserId, ct);
+        var mine = caller.All().ToList();
+
+        (page, pageSize) = Paging.Clamp(page, pageSize, MaxPageSize);
+
         var deals = await _db.Deals
-            .Where(d => d.BuyerId == partyId || d.SellerId == partyId)
+            .Where(d => mine.Contains(d.BuyerId) || mine.Contains(d.SellerId))
             .OrderByDescending(d => d.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync(ct);
 
         return deals.Select(ToResponse).ToList();
     }
 
-    public async Task<IReadOnlyList<DealStatusHistoryResponse>> GetHistoryAsync(Guid dealId, CancellationToken ct)
+    public async Task<IReadOnlyList<DealStatusHistoryResponse>> GetHistoryAsync(Guid dealId, Guid actorUserId, CancellationToken ct)
     {
-        await FindAsync(dealId, ct);
+        var deal = await FindAsync(dealId, ct);
+        await RequirePartyAsync(deal, actorUserId, ct);
 
         var history = await _db.DealStatusHistories
             .Where(h => h.DealId == dealId)
@@ -81,9 +122,14 @@ public class DealService : IDealService
         return history.Select(ToResponse).ToList();
     }
 
-    public async Task<DealResponse> TransitionAsync(Guid dealId, string newStatus, Guid? changedBy, string? reason, CancellationToken ct)
+    public async Task<DealResponse> TransitionAsync(Guid dealId, string newStatus, Guid actorUserId, string? reason, CancellationToken ct)
     {
         var deal = await FindAsync(dealId, ct);
+
+        // The actor used to be recorded in the audit row and never checked, so any authenticated
+        // user could cancel or complete any deal in the system.
+        var caller = await RequirePartyAsync(deal, actorUserId, ct);
+        Guid? changedBy = actorUserId;
 
         DealStatus current;
         DealStatus target;
@@ -97,10 +143,12 @@ public class DealService : IDealService
             throw new TransactionDomainException(HttpStatusCode.BadRequest, $"'{newStatus}' is not a valid deal status.");
         }
 
-        if (!AllowedTransitions[current].Contains(target))
+        if (!AllowedTransitions.TryGetValue(current, out var allowed) || !allowed.Contains(target))
         {
             throw new TransactionDomainException(HttpStatusCode.BadRequest, $"Cannot move a deal from {deal.Status} to {newStatus}.");
         }
+
+        RequireTransitionAuthority(deal, target, caller);
 
         var now = DateTimeOffset.UtcNow;
         var previousStatus = deal.Status;
@@ -126,7 +174,33 @@ public class DealService : IDealService
             Reason = reason
         });
 
-        await _db.SaveChangesAsync(ct);
+        // The status change and its escrow settlement must be one atomic unit. Committing the
+        // status first and settling afterwards would leave a deal marked COMPLETED with the
+        // buyer's money still held if the payout failed.
+        await using (var dbTransaction = await _db.Database.BeginTransactionAsync(ct))
+        {
+            await _db.SaveChangesAsync(ct);
+
+            // Completing a deal releases the held funds to the seller; cancelling returns them to
+            // the buyer. Both are no-ops when the deal was never paid, so an unpaid deal still
+            // cancels cleanly. WalletService joins this transaction rather than opening its own.
+            if (target == DealStatus.Completed)
+            {
+                await _wallets.ReleaseEscrowAsync(deal.DealId, ct);
+            }
+            else if (target == DealStatus.Cancelled)
+            {
+                await _wallets.RefundEscrowAsync(deal.DealId, ct);
+            }
+
+            await dbTransaction.CommitAsync(ct);
+        }
+
+        // Write-invalidation: GetAsync caches this deal under the same key, so a transition that
+        // didn't evict it would keep serving the pre-transition status for up to DealCacheTtl.
+        // A deal's status gates payment, so a stale read here is not the low-stakes staleness the
+        // read-only lookups elsewhere tolerate.
+        await _cache.DeleteAsync(DealCacheKey(dealId));
 
         // Real gRPC domain call (full-mesh plan, plans/pure-hugging-puzzle.md): notify both
         // parties of the status change via notification-service. buyer_id/seller_id are
@@ -143,6 +217,48 @@ public class DealService : IDealService
 
         return ToResponse(deal);
     }
+
+    private async Task<MarketplaceAccounts> RequireAccountsAsync(Guid actorUserId, CancellationToken ct)
+    {
+        var caller = await _accounts.ResolveAsync(actorUserId, ct);
+        if (!caller.ControlsAny)
+        {
+            throw new TransactionDomainException(
+                HttpStatusCode.Forbidden,
+                "This account has no vendor or corporate profile, so it cannot trade.");
+        }
+
+        return caller;
+    }
+
+    private async Task<MarketplaceAccounts> RequirePartyAsync(Deal deal, Guid actorUserId, CancellationToken ct)
+    {
+        var caller = await RequireAccountsAsync(actorUserId, ct);
+        if (!caller.Controls(deal.BuyerId) && !caller.Controls(deal.SellerId))
+        {
+            throw new TransactionDomainException(HttpStatusCode.Forbidden, "You are not a party to this deal.");
+        }
+
+        return caller;
+    }
+
+    private static void RequireTransitionAuthority(Deal deal, DealStatus target, MarketplaceAccounts caller)
+    {
+        if (!TransitionAuthority.TryGetValue(target, out var required) || required == DealParty.Either)
+        {
+            return;
+        }
+
+        var requiredAccountId = required == DealParty.Buyer ? deal.BuyerId : deal.SellerId;
+        if (!caller.Controls(requiredAccountId))
+        {
+            var who = required == DealParty.Buyer ? "buyer" : "seller";
+            throw new TransactionDomainException(
+                HttpStatusCode.Forbidden, $"Only the {who} may move this deal to {target.ToDbValue()}.");
+        }
+    }
+
+    private static string DealCacheKey(Guid dealId) => $"cache:transaction:deal:{dealId}";
 
     private async Task<Deal> FindAsync(Guid dealId, CancellationToken ct)
     {

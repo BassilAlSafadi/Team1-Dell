@@ -7,10 +7,22 @@ const healthProto = loadProto('health/v1/health.proto').grpc.health.v1;
 
 const credentials = grpc.credentials.createInsecure();
 
+// Peers now require the mesh token on every call, so attach it to all outgoing requests.
+function internalTokenInterceptor(options, nextCall) {
+  return new grpc.InterceptingCall(nextCall(options), {
+    start(metadata, listener, next) {
+      if (env.internalServiceToken) {
+        metadata.set('x-internal-token', env.internalServiceToken);
+      }
+      next(metadata, listener);
+    },
+  });
+}
+
 // Lazily built — a peer being unconfigured/down must never crash this process at require time.
 function buildClient(ServiceClient, address) {
   if (!address) return null;
-  return new ServiceClient(address, credentials);
+  return new ServiceClient(address, credentials, { interceptors: [internalTokenInterceptor] });
 }
 
 const notificationClient = buildClient(notificationProto.NotificationService, env.grpcPeers.notification);

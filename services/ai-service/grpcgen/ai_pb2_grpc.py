@@ -52,6 +52,11 @@ class AiServiceStub(object):
                 request_serializer=ai__pb2.ChatRequest.SerializeToString,
                 response_deserializer=ai__pb2.ChatResponse.FromString,
                 _registered_method=True)
+        self.ChatStream = channel.unary_stream(
+                '/ai.v1.AiService/ChatStream',
+                request_serializer=ai__pb2.ChatRequest.SerializeToString,
+                response_deserializer=ai__pb2.ChatChunk.FromString,
+                _registered_method=True)
 
 
 class AiServiceServicer(object):
@@ -78,6 +83,16 @@ class AiServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ChatStream(self, request, context):
+        """Same request as Chat, but streams the reply as it's generated instead of waiting for
+        the full turn. `reset` marks a Gemini fallback retry restarting the reply from
+        scratch — any text_delta already received for this turn should be discarded and
+        display should start over. `done` marks the final chunk (empty text_delta).
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_AiServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -95,6 +110,11 @@ def add_AiServiceServicer_to_server(servicer, server):
                     servicer.Chat,
                     request_deserializer=ai__pb2.ChatRequest.FromString,
                     response_serializer=ai__pb2.ChatResponse.SerializeToString,
+            ),
+            'ChatStream': grpc.unary_stream_rpc_method_handler(
+                    servicer.ChatStream,
+                    request_deserializer=ai__pb2.ChatRequest.FromString,
+                    response_serializer=ai__pb2.ChatChunk.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -181,6 +201,33 @@ class AiService(object):
             '/ai.v1.AiService/Chat',
             ai__pb2.ChatRequest.SerializeToString,
             ai__pb2.ChatResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ChatStream(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/ai.v1.AiService/ChatStream',
+            ai__pb2.ChatRequest.SerializeToString,
+            ai__pb2.ChatChunk.FromString,
             options,
             channel_credentials,
             insecure,

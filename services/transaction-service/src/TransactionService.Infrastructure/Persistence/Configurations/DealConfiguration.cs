@@ -25,6 +25,9 @@ public class DealConfiguration : IEntityTypeConfiguration<Deal>
 
         builder.HasIndex(d => d.OfferId).IsUnique().HasDatabaseName("uq_deal_offer_id");
         builder.HasIndex(d => d.Status).HasDatabaseName("idx_deal_status");
+        // GET /api/deals/mine filters on these, so they carry a request-path query (migration 0003).
+        builder.HasIndex(d => d.BuyerId).HasDatabaseName("idx_deal_buyer");
+        builder.HasIndex(d => d.SellerId).HasDatabaseName("idx_deal_seller");
 
         builder.HasMany(d => d.StatusHistory)
             .WithOne(h => h.Deal)

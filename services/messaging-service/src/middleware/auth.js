@@ -16,6 +16,9 @@ function requireAuth(req, res, next) {
     const payload = jwt.verify(token, env.jwt.signingKey, {
       issuer: env.jwt.issuer,
       audience: env.jwt.audience,
+      // Pin the algorithm rather than relying on the library's key-type inference, so this
+      // cannot become an algorithm-confusion foothold if the key handling ever changes.
+      algorithms: ['HS256'],
     });
     req.userId = payload.sub;
     if (!req.userId) {

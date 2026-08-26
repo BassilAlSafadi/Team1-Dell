@@ -26,6 +26,11 @@ TRANSACTION_GRPC_ADDR = os.getenv("TRANSACTION_GRPC_ADDR", "localhost:6002")
 MESSAGING_GRPC_ADDR = os.getenv("MESSAGING_GRPC_ADDR", "localhost:6003")
 NOTIFICATION_GRPC_ADDR = os.getenv("NOTIFICATION_GRPC_ADDR", "localhost:6004")
 
+# Peers now require the mesh's shared token on every call.
+INTERNAL_SERVICE_TOKEN = os.getenv("INTERNAL_SERVICE_TOKEN", "")
+
+INTERNAL_METADATA = (("x-internal-token", INTERNAL_SERVICE_TOKEN),)
+
 PEER_ADDRESSES = {
     "auth": AUTH_GRPC_ADDR,
     "transaction": TRANSACTION_GRPC_ADDR,

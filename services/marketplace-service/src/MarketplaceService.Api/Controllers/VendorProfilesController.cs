@@ -32,6 +32,13 @@ public class VendorProfilesController : ControllerBase
         return Ok(vendor);
     }
 
+    [HttpPatch("mine")]
+    public async Task<ActionResult<VendorProfileResponse>> UpdateMine(UpdateVendorProfileRequest request, CancellationToken ct)
+    {
+        var vendor = await _vendorProfileService.UpdateMineAsync(CurrentUserId(), request, ct);
+        return Ok(vendor);
+    }
+
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<VendorProfileResponse>>> Search(
         [FromQuery] string? category, [FromQuery] string? city, [FromQuery] string? q, CancellationToken ct)

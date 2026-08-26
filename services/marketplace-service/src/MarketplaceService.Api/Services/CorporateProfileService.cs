@@ -61,6 +61,34 @@ public class CorporateProfileService : ICorporateProfileService
         return ToResponse(corporate);
     }
 
+    // Mirrors VendorProfileService.SearchAsync (industry stands in for vendor's category —
+    // there's no natural "category" dimension on a corporate profile). Also doubles as the
+    // plain list a caller with only a business owner's user_id (e.g. messaging conversation
+    // participants) uses to resolve a display name, the same way the vendor list already
+    // does for FindVendorsPage/messaging.
+    public async Task<IReadOnlyList<CorporateProfileResponse>> SearchAsync(string? industry, string? city, string? q, CancellationToken ct)
+    {
+        var query = _db.Corporates.AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(industry))
+        {
+            query = query.Where(c => c.Industry == industry);
+        }
+
+        if (!string.IsNullOrWhiteSpace(city))
+        {
+            query = query.Where(c => c.LocationText != null && EF.Functions.ILike(c.LocationText, $"%{city}%"));
+        }
+
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            query = query.Where(c => EF.Functions.ILike(c.CompanyName, $"%{q}%"));
+        }
+
+        var corporates = await query.ToListAsync(ct);
+        return corporates.Select(ToResponse).ToList();
+    }
+
     private static CorporateProfileResponse ToResponse(Corporate corporate) => new(
         corporate.CorporateId,
         corporate.UserId,

@@ -7,6 +7,9 @@ const { assertParticipant } = require('../services/participation');
 const { notificationClient } = require('../grpc/clients');
 
 const PREVIEW_LENGTH = 120;
+const MAX_CONTENT_LENGTH = 8000;
+const MAX_REACTION_LENGTH = 32;
+const MAX_ATTACHMENTS = 10;
 
 // POST /api/conversations/:id/messages
 const sendMessage = asyncHandler(async (req, res) => {
@@ -18,6 +21,14 @@ const sendMessage = asyncHandler(async (req, res) => {
   const { content, messageType, attachments, replyToMessageId } = req.body;
   if (!content || typeof content !== 'string') {
     throw new HttpError(400, 'content is required.');
+  }
+  // Unbounded content/attachments went straight into the document; cap them so one request
+  // can't write an arbitrarily large record.
+  if (content.length > MAX_CONTENT_LENGTH) {
+    throw new HttpError(400, `content must be at most ${MAX_CONTENT_LENGTH} characters.`);
+  }
+  if (attachments !== undefined && (!Array.isArray(attachments) || attachments.length > MAX_ATTACHMENTS)) {
+    throw new HttpError(400, `attachments must be an array of at most ${MAX_ATTACHMENTS} items.`);
   }
   if (replyToMessageId && !mongoose.isValidObjectId(replyToMessageId)) {
     throw new HttpError(400, 'Invalid replyToMessageId.');
@@ -96,7 +107,10 @@ const listMessages = asyncHandler(async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 30, 100);
   const before = req.query.before ? new Date(req.query.before) : null;
 
-  const filter = { conversation_id: conversationId };
+  // deleted_at must be part of the filter: deleteMessage only soft-deletes, so without this a
+  // deleted message reappears on the next page load even though every connected client was told
+  // to drop it via the message:deleted socket event.
+  const filter = { conversation_id: conversationId, deleted_at: null };
   if (before && !Number.isNaN(before.getTime())) {
     filter.created_at = { $lt: before };
   }
@@ -132,6 +146,9 @@ const addReaction = asyncHandler(async (req, res) => {
 
   const { reaction } = req.body;
   if (!reaction || typeof reaction !== 'string') throw new HttpError(400, 'reaction is required.');
+  if (reaction.length > MAX_REACTION_LENGTH) {
+    throw new HttpError(400, `reaction must be at most ${MAX_REACTION_LENGTH} characters.`);
+  }
 
   const message = await Message.findById(messageId);
   if (!message) throw new HttpError(404, 'Message not found.');

@@ -25,3 +25,8 @@ services/notification-service/*.exe
 
 # run-services.sh output
 /logs/
+
+# Tool caches — regenerable, shouldn't be tracked
+.pytest_cache/
+.ruff_cache/
+*.log

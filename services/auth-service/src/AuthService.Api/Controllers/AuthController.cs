@@ -27,7 +27,7 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<ActionResult<TokenResponse>> Login(LoginRequest request, CancellationToken ct)
     {
-        var tokens = await _authenticationService.LoginAsync(request.Email, request.Password, ct);
+        var tokens = await _authenticationService.LoginAsync(request.Email, request.Password, ClientIp(), ct);
         return Ok(tokens);
     }
 
@@ -62,4 +62,12 @@ public class AuthController : ControllerBase
         var user = await _authenticationService.GetUserAsync(userId, ct);
         return Ok(user);
     }
+
+    /// <summary>
+    /// The caller's IP as seen by this service. Only ever used as a throttling key, never for
+    /// authorization — it comes from the connection, not from a client-supplied header, because
+    /// X-Forwarded-For is trivially spoofable.
+    /// </summary>
+    private string? ClientIp() => HttpContext.Connection.RemoteIpAddress?.ToString();
 }
+

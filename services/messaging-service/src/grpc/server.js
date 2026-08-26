@@ -3,19 +3,26 @@ const { HealthImplementation } = require('grpc-health-check');
 const mongoose = require('mongoose');
 const env = require('../config/env');
 const { getConversationById } = require('../services/conversationCache');
+const { assertParticipant } = require('../services/participation');
+const { requireInternalCaller } = require('./internalAuth');
 const { loadProto } = require('./protoLoader');
 
 const messagingProto = loadProto('messaging/v1/messaging.proto').messaging.v1;
 
-// Mirrors conversations.controller.js's getConversation query — no new business logic,
-// just an additive gRPC interface over the same read. Exposed for future gRPC consumers;
-// no caller wires this yet in this pass (see proto/messaging/v1/messaging.proto).
+// Mirrors conversations.controller.js's getConversation query, INCLUDING its participation
+// check. Without that check this was a way to read any conversation by id: the REST route
+// enforced participation but the gRPC route (which the gateway prefers for this path) did not.
 async function getConversation(call, callback) {
   try {
+    const userId = requireInternalCaller(call);
+
     const { conversation_id: conversationId } = call.request;
     if (!mongoose.isValidObjectId(conversationId)) {
       return callback({ code: grpc.status.INVALID_ARGUMENT, details: 'Invalid conversation id.' });
     }
+
+    // Per the EERD's security rules, a conversation_id alone is never sufficient.
+    await assertParticipant(conversationId, userId);
 
     const conversation = await getConversationById(conversationId);
     if (!conversation) {
@@ -40,6 +47,14 @@ async function getConversation(call, callback) {
       updated_at: { seconds: Math.floor(conversation.updated_at.getTime() / 1000), nanos: 0 },
     });
   } catch (err) {
+    // assertParticipant throws { status: 403 }; requireInternalCaller throws a gRPC-shaped
+    // error already. Anything else is genuinely internal.
+    if (err && typeof err.code === 'number') {
+      return callback(err);
+    }
+    if (err && err.status === 403) {
+      return callback({ code: grpc.status.PERMISSION_DENIED, details: err.message });
+    }
     callback({ code: grpc.status.INTERNAL, details: err.message });
   }
 }

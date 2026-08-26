@@ -29,6 +29,16 @@ func New(rawAddr, backendName string, checker *health.Checker) (http.Handler, er
 	originalDirector := rp.Director
 	rp.Director = func(r *http.Request) {
 		originalDirector(r)
+
+		// Strip unconditionally BEFORE setting: these headers are ours to assert, never the
+		// client's to supply. Without this, a caller could send its own X-User-Id/X-User-Roles
+		// and have them pass straight through whenever we don't overwrite them — on an
+		// OptionalAuth route with no token, or on any request whose token carries no roles
+		// claim. No backend reads these today, but the moment one does it would be trusting
+		// attacker-controlled input.
+		r.Header.Del("X-User-Id")
+		r.Header.Del("X-User-Roles")
+
 		if userID := middleware.UserID(r); userID != "" {
 			r.Header.Set("X-User-Id", userID)
 		}
@@ -39,7 +49,9 @@ func New(rawAddr, backendName string, checker *health.Checker) (http.Handler, er
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !checker.Healthy(backendName) {
-			http.Error(w, `{"error":"Service temporarily unavailable."}`, http.StatusServiceUnavailable)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(`{"error":"Service temporarily unavailable."}`))
 			return
 		}
 		rp.ServeHTTP(w, r)

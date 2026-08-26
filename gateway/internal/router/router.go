@@ -54,16 +54,21 @@ func New(cfg *config.Config, clients *grpcclients.Clients, limiter ratelimit.Lim
 
 	r := chi.NewRouter()
 	r.Use(chimiddleware.RequestID)
-	r.Use(chimiddleware.RealIP)
+	// chimiddleware.RealIP is deliberately NOT used: it rewrites RemoteAddr from the
+	// client-supplied X-Forwarded-For/X-Real-IP headers for every request, which would hand the
+	// rate limiter a spoofable key again. appmw.RateLimit consults X-Forwarded-For itself, but
+	// only when the peer is a configured trusted proxy.
 	r.Use(chimiddleware.Logger)
 	r.Use(chimiddleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   corsOrigins(cfg.CORSOrigins),
+		// No wildcard fallback: CORS_ORIGINS is a required config value, so an unconfigured
+		// deploy fails at startup rather than quietly allowing every origin.
+		AllowedOrigins:   cfg.CORSOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
 		AllowedHeaders:   []string{"Authorization", "Content-Type"},
 		AllowCredentials: true,
 	}))
-	r.Use(appmw.RateLimit(limiter))
+	r.Use(appmw.RateLimit(limiter, cfg.TrustedProxies))
 
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -95,25 +100,43 @@ func New(cfg *config.Config, clients *grpcclients.Clients, limiter ratelimit.Lim
 	// --- transaction-service ---
 	r.Group(func(r chi.Router) {
 		r.Use(requireAuth) // every transaction-service route requires auth today
+		// /api/deals/mine and /api/offers/mine replace the old party/{id}, buyer/{id} and
+		// seller/{id} routes, which took an account id from the URL and so let any authenticated
+		// user enumerate anyone else's deals and offers. They are plain REST-proxied.
+		//
+		// /api/deals/mine must be registered as its own literal route, not left to the
+		// "/api/deals/*" wildcard mount below: chi's radix tree prefers a named param
+		// ({dealId}) over a wildcard (*) at the same segment, so without this, GET
+		// /api/deals/mine matched {dealId}="mine" and hit the gRPC single-deal lookup with
+		// "mine" where a GUID was expected. A literal segment outranks both, restoring the
+		// "literal beats wildcard" precedence described in the package doc above.
+		r.Handle("/api/deals/mine", transactionProxy)
 		r.Get("/api/deals/{dealId}", handlers.Deal(clients.Transaction))
-		r.Handle("/api/wallets/*", transactionProxy)
-		r.Handle("/api/payment-methods/*", transactionProxy)
-		r.Handle("/api/offers/*", transactionProxy)
-		r.Handle("/api/deals/*", transactionProxy)
+		// Bare-path routes registered alongside their wildcards — chi's "/*" pattern only
+		// matches a path with a trailing segment, so a bodyless GET/POST straight to the
+		// resource root (e.g. "GET /api/wallets") needs its own entry (see marketplace-service
+		// below, where this was first worked around).
+		for _, prefix := range []string{"/api/wallets", "/api/payment-methods", "/api/offers", "/api/deals"} {
+			r.Handle(prefix, transactionProxy)
+			r.Handle(prefix+"/*", transactionProxy)
+		}
 	})
 
 	// --- messaging-service ---
 	r.Group(func(r chi.Router) {
 		r.Use(requireAuth)
 		r.Get("/api/conversations/{conversationId}", handlers.Conversation(clients.Messaging))
-		r.Handle("/api/conversations/*", messagingProxy)
-		r.Handle("/api/messages/*", messagingProxy)
+		for _, prefix := range []string{"/api/conversations", "/api/messages"} {
+			r.Handle(prefix, messagingProxy)
+			r.Handle(prefix+"/*", messagingProxy)
+		}
 	})
 
 	// --- notification-service (no gRPC read RPC exposed to end users yet — CreateNotification
 	// is the internal mesh's write path other backend services call, not a user-facing route) ---
 	r.Group(func(r chi.Router) {
 		r.Use(requireAuth)
+		r.Handle("/api/notifications", notificationProxy)
 		r.Handle("/api/notifications/*", notificationProxy)
 	})
 
@@ -123,6 +146,7 @@ func New(cfg *config.Config, clients *grpcclients.Clients, limiter ratelimit.Lim
 		r.Post("/api/ai/classify", handlers.ClassifyWaste(clients.Ai))
 		r.Get("/api/ai/recommendation", handlers.Recommendation(clients.Ai))
 		r.Post("/api/ai/chat", handlers.Chat(clients.Ai))
+		r.Post("/api/ai/chat/stream", handlers.ChatStream(clients.Ai))
 	})
 
 	// --- marketplace-service (REST-only, no gRPC server — same proxy-only shape as
@@ -140,11 +164,4 @@ func New(cfg *config.Config, clients *grpcclients.Clients, limiter ratelimit.Lim
 	})
 
 	return r, nil
-}
-
-func corsOrigins(origins []string) []string {
-	if len(origins) == 0 {
-		return []string{"*"}
-	}
-	return origins
 }

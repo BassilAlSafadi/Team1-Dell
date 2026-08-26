@@ -3,11 +3,14 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"google.golang.org/grpc/status"
 
 	aiv1 "gateway/internal/grpcgen/ai/v1"
 	"gateway/internal/middleware"
@@ -175,6 +178,102 @@ func Chat(client aiv1.AiServiceClient) http.HandlerFunc {
 			"threadId": resp.GetThreadId(),
 		})
 	}
+}
+
+// ChatStream handles POST /api/ai/chat/stream over gRPC server-streaming — same request
+// shape as Chat, but relays the reply to the browser as Server-Sent Events as ai-service
+// generates it, instead of waiting for the full turn.
+func ChatStream(client aiv1.AiServiceClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID := middleware.UserID(r)
+		if userID == "" {
+			transform.WriteError(w, http.StatusUnauthorized, "Missing bearer token.")
+			return
+		}
+
+		var body struct {
+			Message  string `json:"message"`
+			ThreadID string `json:"threadId"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			transform.WriteError(w, http.StatusBadRequest, "Invalid JSON body: "+err.Error())
+			return
+		}
+		if body.Message == "" {
+			transform.WriteError(w, http.StatusBadRequest, "message is required.")
+			return
+		}
+
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			transform.WriteError(w, http.StatusInternalServerError, "Streaming not supported.")
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(transform.WithIdentity(r.Context(), r), 120*time.Second)
+		defer cancel()
+
+		req := &aiv1.ChatRequest{
+			UserId:  userID,
+			Message: body.Message,
+		}
+		if body.ThreadID != "" {
+			req.ThreadId = &body.ThreadID
+		}
+
+		stream, err := client.ChatStream(ctx, req)
+		if err != nil {
+			transform.WriteGRPCError(w, err)
+			return
+		}
+
+		// Headers/status are committed on the first Write/Flush, so everything above this
+		// point can still fail as a normal JSON error response — everything below cannot.
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+		w.WriteHeader(http.StatusOK)
+
+		for {
+			chunk, err := stream.Recv()
+			if errors.Is(err, io.EOF) {
+				return
+			}
+			if err != nil {
+				writeSSE(w, map[string]any{"error": statusMessage(err)})
+				flusher.Flush()
+				return
+			}
+
+			writeSSE(w, map[string]any{
+				"textDelta": chunk.GetTextDelta(),
+				"threadId":  chunk.GetThreadId(),
+				"done":      chunk.GetDone(),
+				"reset":     chunk.GetReset_(),
+			})
+			flusher.Flush()
+		}
+	}
+}
+
+// statusMessage extracts the human-readable message from a gRPC error the same way
+// transform.WriteGRPCError does, for the mid-stream case where headers are already
+// committed and a JSON status response is no longer possible.
+func statusMessage(err error) string {
+	if st, ok := status.FromError(err); ok {
+		return st.Message()
+	}
+	return err.Error()
+}
+
+func writeSSE(w http.ResponseWriter, payload any) {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return
+	}
+	_, _ = w.Write([]byte("data: "))
+	_, _ = w.Write(data)
+	_, _ = w.Write([]byte("\n\n"))
 }
 
 func readImage(w http.ResponseWriter, r *http.Request) (data []byte, name string, err error) {

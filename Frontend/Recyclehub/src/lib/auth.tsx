@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { api, setAccessToken } from './api'
+import { api, setAccessToken, setRefreshToken, setAuthHandlers } from './api'
 
 const STORAGE_KEY = 'recyclehub.auth'
 
@@ -101,7 +101,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setAccessToken(tokens?.accessToken ?? null)
+    setRefreshToken(tokens?.refreshToken ?? null)
   }, [tokens])
+
+  // Registered once — api.ts calls these on a silent refresh (keeps localStorage/state in
+  // sync without a re-render-driven round trip) and when refresh itself fails (session over).
+  useEffect(() => {
+    setAuthHandlers({
+      onTokensRefreshed: (next) => {
+        storeTokens(next)
+        setTokens(next)
+      },
+      onAuthExpired: () => {
+        storeTokens(null)
+        setTokens(null)
+        setUser(null)
+      },
+    })
+  }, [])
 
   const applyTokens = (next: TokenResponse) => {
     const stored: StoredTokens = { accessToken: next.accessToken, refreshToken: next.refreshToken }

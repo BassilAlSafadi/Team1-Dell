@@ -55,6 +55,25 @@ public class VendorProfileService : IVendorProfileService
         return ToResponse(vendor);
     }
 
+    public async Task<VendorProfileResponse> UpdateMineAsync(Guid userId, UpdateVendorProfileRequest request, CancellationToken ct)
+    {
+        var vendor = await _db.Vendors.FirstOrDefaultAsync(v => v.UserId == userId, ct)
+            ?? throw new MarketplaceDomainException(HttpStatusCode.NotFound, "No vendor profile found for this account.");
+
+        if (request.VendorName is not null) vendor.VendorName = request.VendorName;
+        if (request.Description is not null) vendor.Description = request.Description;
+        if (request.BusinessRegistrationNumber is not null) vendor.BusinessRegistrationNumber = request.BusinessRegistrationNumber;
+        if (request.CategoryPreference is not null) vendor.CategoryPreference = request.CategoryPreference;
+        if (request.FulfillmentMethod is not null) vendor.FulfillmentMethod = request.FulfillmentMethod;
+        if (request.OperatingHours is not null) vendor.OperatingHours = request.OperatingHours;
+        if (request.LocationText is not null) vendor.LocationText = request.LocationText;
+        if (request.MinimumAmount is not null) vendor.MinimumAmount = request.MinimumAmount;
+        vendor.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _db.SaveChangesAsync(ct);
+        return ToResponse(vendor);
+    }
+
     public async Task<IReadOnlyList<VendorProfileResponse>> SearchAsync(string? category, string? city, string? q, CancellationToken ct)
     {
         var query = _db.Vendors.AsQueryable();

@@ -182,7 +182,7 @@ function DashboardPage() {
         setCompanyName(corporateResult.value.companyName)
         try {
           const partyDeals = await api.get<DealResponse[]>(
-            `/api/deals/party/${corporateResult.value.corporateId}`,
+            '/api/deals/mine',
           )
           setDeals(partyDeals)
         } catch {

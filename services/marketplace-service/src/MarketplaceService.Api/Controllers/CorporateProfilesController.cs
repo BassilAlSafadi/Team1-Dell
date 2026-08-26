@@ -32,6 +32,14 @@ public class CorporateProfilesController : ControllerBase
         return Ok(corporate);
     }
 
+    [HttpGet]
+    public async Task<ActionResult<IReadOnlyList<CorporateProfileResponse>>> Search(
+        [FromQuery] string? industry, [FromQuery] string? city, [FromQuery] string? q, CancellationToken ct)
+    {
+        var corporates = await _corporateProfileService.SearchAsync(industry, city, q, ct);
+        return Ok(corporates);
+    }
+
     [HttpGet("{corporateId:guid}")]
     public async Task<ActionResult<CorporateProfileResponse>> Get(Guid corporateId, CancellationToken ct)
     {

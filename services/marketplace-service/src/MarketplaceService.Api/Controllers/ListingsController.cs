@@ -26,17 +26,19 @@ public class ListingsController : ControllerBase
     }
 
     [HttpGet("mine")]
-    public async Task<ActionResult<IReadOnlyList<ListingResponse>>> ListMine(CancellationToken ct)
+    public async Task<ActionResult<IReadOnlyList<ListingResponse>>> ListMine(
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken ct = default)
     {
-        var listings = await _listingService.ListMineAsync(CurrentUserId(), ct);
+        var listings = await _listingService.ListMineAsync(CurrentUserId(), page, pageSize, ct);
         return Ok(listings);
     }
 
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<ListingResponse>>> Search(
-        [FromQuery] string? status, [FromQuery] short? categoryId, CancellationToken ct)
+        [FromQuery] string? status, [FromQuery] short? categoryId,
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken ct = default)
     {
-        var listings = await _listingService.SearchAsync(status, categoryId, ct);
+        var listings = await _listingService.SearchAsync(status, categoryId, page, pageSize, ct);
         return Ok(listings);
     }
 

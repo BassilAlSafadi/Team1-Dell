@@ -201,6 +201,54 @@
   width: 100%;
 }
 
+/* Vendor profile edit form */
+
+.profile-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  label {
+    margin-top: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-h);
+  }
+
+  input {
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #fff;
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--text-h);
+    transition: border-color 0.2s, box-shadow 0.2s;
+
+    &:focus {
+      outline: none;
+      border-color: var(--green);
+      box-shadow: 0 0 0 3px var(--green-light);
+    }
+  }
+}
+
+.profile-edit-error {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #b3261e;
+}
+
+.profile-edit-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+
+  button {
+    flex: 1;
+  }
+}
+
 /* Recent requests panel */
 
 .activity-list {

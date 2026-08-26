@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import queue
 import sys
 from concurrent import futures
 from pathlib import Path
@@ -35,9 +36,15 @@ import notification_pb2  # noqa: E402
 
 from chatbot import config as chatbot_config  # noqa: E402
 from chatbot.agent import build_llm, new_conversation, run_turn  # noqa: E402
-from db.repository import add_message, create_thread, get_messages_for_thread  # noqa: E402
+from db.repository import (  # noqa: E402
+    add_message,
+    create_thread,
+    get_messages_for_thread,
+    thread_belongs_to,
+)
 from gemini_keys import call_with_gemini_fallback  # noqa: E402
-from grpc_clients import notification_stub  # noqa: E402
+from grpc_clients import INTERNAL_METADATA, notification_stub  # noqa: E402
+from internal_auth import InternalAuthInterceptor  # noqa: E402
 from langchain_core.messages import AIMessage, HumanMessage  # noqa: E402
 from mesh_status import start_mesh_status_server  # noqa: E402
 from vendor_cache import get_vendor_recommendations  # noqa: E402
@@ -55,6 +62,14 @@ logger = logging.getLogger("ai-service.grpc")
 GRPC_PORT = os.getenv("GRPC_PORT", "6005")
 
 _NOTIFICATION_CALL_TIMEOUT_SECONDS = 3.0
+
+MAX_CHAT_MESSAGE_CHARS = 8000
+DEFAULT_SCAN_LIMIT = 200
+MAX_SCAN_LIMIT = 1000
+
+# Shared mesh secret. Required: this server's RPCs act on a caller-supplied user_id, so the port
+# must never be callable by anything but the gateway and other mesh peers.
+INTERNAL_SERVICE_TOKEN = os.getenv("INTERNAL_SERVICE_TOKEN", "")
 
 
 def _detected_items_to_proto(items) -> list[ai_pb2.DetectedItem]:
@@ -97,7 +112,13 @@ class AiServiceServicer(ai_pb2_grpc.AiServiceServicer):
             await context.abort(grpc.StatusCode.INTERNAL, result.error or "Classification failed.")
             return ai_pb2.ClassifyWasteResponse()
 
-        classification_id = save_classification_result(result, user_id=request.user_id) or ""
+        try:
+            classification_id = save_classification_result(result, user_id=request.user_id) or ""
+        except Exception:
+            # Best-effort, same as _notify_hazard below: a persistence outage (e.g. Mongo
+            # unreachable) must never fail a classification the user is actively waiting on.
+            logger.exception("Failed to persist classification result")
+            classification_id = ""
 
         business_location = request.business_location if request.HasField("business_location") else None
         vendors_by_category = await get_vendor_recommendations(result.classification, business_location=business_location)
@@ -133,6 +154,7 @@ class AiServiceServicer(ai_pb2_grpc.AiServiceServicer):
                     entity=notification_pb2.EntityRef(type="classification", id=classification_id),
                 ),
                 timeout=_NOTIFICATION_CALL_TIMEOUT_SECONDS,
+                metadata=INTERNAL_METADATA,
             )
         except grpc.RpcError as exc:
             logger.warning("Hazard notification failed (notification-service unreachable?): %s", exc)
@@ -140,7 +162,11 @@ class AiServiceServicer(ai_pb2_grpc.AiServiceServicer):
             logger.exception("Unexpected error sending hazard notification.")
 
     async def GetRecommendation(self, request: ai_pb2.GetRecommendationRequest, context):
-        limit = request.scan_limit or 200
+        # scan_limit arrives straight from a query string, so clamp it: a negative value is
+        # meaningless to Mongo's limit() and a huge one is an easy way to pull the whole
+        # collection into memory.
+        limit = request.scan_limit or DEFAULT_SCAN_LIMIT
+        limit = max(1, min(limit, MAX_SCAN_LIMIT))
         scans = load_scans(request.user_id, limit=limit)
 
         analysis = analyze_waste(scans)
@@ -164,6 +190,17 @@ class AiServiceServicer(ai_pb2_grpc.AiServiceServicer):
         )
 
     async def Chat(self, request: ai_pb2.ChatRequest, context):
+        if not request.message or not request.message.strip():
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "message must not be empty.")
+            return ai_pb2.ChatResponse()
+
+        if len(request.message) > MAX_CHAT_MESSAGE_CHARS:
+            await context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                f"message must be at most {MAX_CHAT_MESSAGE_CHARS} characters.",
+            )
+            return ai_pb2.ChatResponse()
+
         if not chatbot_config.VECTOR_STORE_DIR.exists() or not any(chatbot_config.VECTOR_STORE_DIR.iterdir()):
             await context.abort(
                 grpc.StatusCode.FAILED_PRECONDITION,
@@ -171,8 +208,95 @@ class AiServiceServicer(ai_pb2_grpc.AiServiceServicer):
             )
             return ai_pb2.ChatResponse()
 
+        try:
+            thread_id = request.thread_id if request.HasField("thread_id") and request.thread_id else None
+            if thread_id:
+                # A thread id alone must never be enough to read or extend a conversation:
+                # without this, any caller could pass another user's threadId and have their
+                # entire history replayed into the model (and their thread appended to).
+                if not thread_belongs_to(thread_id, request.user_id):
+                    await context.abort(
+                        grpc.StatusCode.PERMISSION_DENIED,
+                        "That conversation does not exist or does not belong to you.",
+                    )
+                    return ai_pb2.ChatResponse()
+
+                messages = new_conversation()
+                for doc in get_messages_for_thread(thread_id):
+                    if doc["role"] == "human":
+                        messages.append(HumanMessage(content=doc["content"]))
+                    elif doc["role"] == "ai":
+                        messages.append(AIMessage(content=doc["content"]))
+            else:
+                thread_id = create_thread(request.user_id)
+                messages = new_conversation()
+
+            messages.append(HumanMessage(content=request.message))
+            add_message(thread_id, "human", request.message)
+
+            checkpoint = len(messages)
+            response_chunks: list[str] = []
+
+            def attempt(model: str, api_key: str):
+                del messages[checkpoint:]
+                response_chunks.clear()
+                turn_llm = build_llm(model=model, api_key=api_key)
+                return run_turn(messages, turn_llm, on_chunk=response_chunks.append)
+
+            await asyncio.to_thread(call_with_gemini_fallback, attempt)
+
+            reply = "".join(response_chunks)
+            add_message(thread_id, "ai", reply)
+        except Exception:
+            # Covers both Mongo (thread/message persistence) and every configured Gemini
+            # model/key failing — logged in full here, but the client only ever sees a short,
+            # safe message (some of these exceptions, e.g. pymongo's, stringify to multi-KB
+            # topology dumps that must never reach the chat UI).
+            logger.exception("Chat request failed")
+            await context.abort(
+                grpc.StatusCode.INTERNAL,
+                "The assistant is temporarily unavailable. Please try again shortly.",
+            )
+            return ai_pb2.ChatResponse()
+
+        return ai_pb2.ChatResponse(reply=reply, thread_id=thread_id)
+
+    async def ChatStream(self, request: ai_pb2.ChatRequest, context):
+        """Same turn as Chat, but yields ChatChunks as the model streams them instead of
+        buffering the whole reply. The Gemini call itself is synchronous (langchain's
+        .stream()), so it runs on a worker thread that pushes onto a plain thread-safe
+        queue.Queue; this coroutine drains that queue and yields as items arrive. Chunks
+        are not buffered per gemini_keys retry: a fallback retry restarts the reply from
+        scratch (see attempt()), so a 'reset' chunk tells the client to discard whatever
+        text_delta it has already rendered for this turn before the retry's deltas arrive.
+        """
+        if not request.message or not request.message.strip():
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "message must not be empty.")
+            return
+
+        if len(request.message) > MAX_CHAT_MESSAGE_CHARS:
+            await context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                f"message must be at most {MAX_CHAT_MESSAGE_CHARS} characters.",
+            )
+            return
+
+        if not chatbot_config.VECTOR_STORE_DIR.exists() or not any(chatbot_config.VECTOR_STORE_DIR.iterdir()):
+            await context.abort(
+                grpc.StatusCode.FAILED_PRECONDITION,
+                "Chat knowledge base not ingested yet - run 'python -m chatbot.ingest' first.",
+            )
+            return
+
         thread_id = request.thread_id if request.HasField("thread_id") and request.thread_id else None
         if thread_id:
+            if not thread_belongs_to(thread_id, request.user_id):
+                await context.abort(
+                    grpc.StatusCode.PERMISSION_DENIED,
+                    "That conversation does not exist or does not belong to you.",
+                )
+                return
+
             messages = new_conversation()
             for doc in get_messages_for_thread(thread_id):
                 if doc["role"] == "human":
@@ -188,28 +312,69 @@ class AiServiceServicer(ai_pb2_grpc.AiServiceServicer):
 
         checkpoint = len(messages)
         response_chunks: list[str] = []
+        q: queue.Queue = queue.Queue()
+        attempt_no = 0
+
+        def on_chunk(text: str) -> None:
+            response_chunks.append(text)
+            q.put(("delta", text))
 
         def attempt(model: str, api_key: str):
+            nonlocal attempt_no
+            if attempt_no > 0:
+                q.put(("reset", None))
+            attempt_no += 1
             del messages[checkpoint:]
             response_chunks.clear()
             turn_llm = build_llm(model=model, api_key=api_key)
-            return run_turn(messages, turn_llm, on_chunk=response_chunks.append)
+            return run_turn(messages, turn_llm, on_chunk=on_chunk)
+
+        def worker() -> None:
+            try:
+                call_with_gemini_fallback(attempt)
+            except Exception as exc:  # noqa: BLE001 - forwarded to the consumer below, not swallowed
+                q.put(("error", exc))
+            else:
+                q.put(("done", None))
+
+        worker_task = asyncio.create_task(asyncio.to_thread(worker))
 
         try:
-            await asyncio.to_thread(call_with_gemini_fallback, attempt)
-        except Exception as exc:
-            logger.exception("Chat request failed on every configured Gemini model/key")
-            await context.abort(grpc.StatusCode.INTERNAL, f"Chat request failed: {exc}")
-            return ai_pb2.ChatResponse()
+            while True:
+                kind, payload = await asyncio.to_thread(q.get)
+                if kind == "delta":
+                    yield ai_pb2.ChatChunk(text_delta=payload, thread_id=thread_id)
+                elif kind == "reset":
+                    yield ai_pb2.ChatChunk(thread_id=thread_id, reset=True)
+                elif kind == "error":
+                    logger.error("Chat stream failed", exc_info=payload)
+                    await context.abort(
+                        grpc.StatusCode.INTERNAL,
+                        "The assistant is temporarily unavailable. Please try again shortly.",
+                    )
+                    return
+                else:  # "done"
+                    break
+        finally:
+            await worker_task
 
         reply = "".join(response_chunks)
-        add_message(thread_id, "ai", reply)
+        try:
+            add_message(thread_id, "ai", reply)
+        except Exception:
+            # Same tolerance as Chat: the user already has the full reply, only the next
+            # turn's history would be short a message, which is already the case whenever
+            # this is transient.
+            logger.exception("Failed to persist assistant reply")
 
-        return ai_pb2.ChatResponse(reply=reply, thread_id=thread_id)
+        yield ai_pb2.ChatChunk(thread_id=thread_id, done=True)
 
 
 async def serve() -> None:
-    server = grpc.aio.server(futures.ThreadPoolExecutor(max_workers=10))
+    server = grpc.aio.server(
+        futures.ThreadPoolExecutor(max_workers=10),
+        interceptors=(InternalAuthInterceptor(INTERNAL_SERVICE_TOKEN),),
+    )
     ai_pb2_grpc.add_AiServiceServicer_to_server(AiServiceServicer(), server)
 
     # grpc.aio needs the aio-flavored HealthServicer (grpc_health.v1.health.aio) —

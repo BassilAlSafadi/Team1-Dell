@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactElement } from 'react'
+import { useEffect, useState, type FormEvent, type ReactElement } from 'react'
 import { Link } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import ChatbotWidget from '../components/ChatbotWidget'
@@ -127,6 +127,26 @@ const ratingIcon = (
   />
 )
 
+type EditForm = {
+  vendorName: string
+  categoryPreference: string
+  fulfillmentMethod: string
+  operatingHours: string
+  locationText: string
+  minimumAmount: string
+}
+
+function toEditForm(vendor: VendorProfileResponse): EditForm {
+  return {
+    vendorName: vendor.vendorName,
+    categoryPreference: vendor.categoryPreference ?? '',
+    fulfillmentMethod: vendor.fulfillmentMethod ?? '',
+    operatingHours: vendor.operatingHours ?? '',
+    locationText: vendor.locationText ?? '',
+    minimumAmount: vendor.minimumAmount != null ? String(vendor.minimumAmount) : '',
+  }
+}
+
 function VendorDashboardPage() {
   const { user } = useAuth()
 
@@ -136,6 +156,12 @@ function VendorDashboardPage() {
   const [stats, setStats] = useState<Stat[]>([])
   const [recentRequests, setRecentRequests] = useState<ActivityItem[]>([])
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [vendorProfile, setVendorProfile] = useState<VendorProfileResponse | null>(null)
+
+  const [isEditing, setIsEditing] = useState(false)
+  const [editForm, setEditForm] = useState<EditForm | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -166,11 +192,11 @@ function VendorDashboardPage() {
 
       try {
         const [offers, deals, authProfile] = await Promise.all([
-          api.get<OfferResponse[]>(`/api/offers/buyer/${vendorProfile.vendorId}`).catch((err) => {
+          api.get<OfferResponse[]>('/api/offers/mine', { role: 'BUYER' }).catch((err) => {
             if (err instanceof ApiError && err.status === 404) return [] as OfferResponse[]
             throw err
           }),
-          api.get<DealResponse[]>(`/api/deals/party/${vendorProfile.vendorId}`).catch((err) => {
+          api.get<DealResponse[]>('/api/deals/mine').catch((err) => {
             if (err instanceof ApiError && err.status === 404) return [] as DealResponse[]
             throw err
           }),
@@ -228,6 +254,7 @@ function VendorDashboardPage() {
           [...offerActivity, ...dealActivity].sort((a, b) => b.sortTs - a.sortTs).slice(0, 4),
         )
 
+        setVendorProfile(vendorProfile)
         setProfile({
           name: vendorProfile.vendorName,
           category: vendorProfile.categoryPreference ?? '—',
@@ -250,6 +277,55 @@ function VendorDashboardPage() {
       cancelled = true
     }
   }, [user])
+
+  const handleEditOpen = () => {
+    if (!vendorProfile) return
+    setEditForm(toEditForm(vendorProfile))
+    setEditError(null)
+    setIsEditing(true)
+  }
+
+  const handleEditCancel = () => {
+    setIsEditing(false)
+    setEditError(null)
+  }
+
+  const updateEditField = (field: keyof EditForm) => (event: { target: { value: string } }) => {
+    setEditForm((prev) => (prev ? { ...prev, [field]: event.target.value } : prev))
+  }
+
+  const handleEditSave = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!editForm) return
+    setIsSaving(true)
+    setEditError(null)
+    try {
+      const updated = await api.patch<VendorProfileResponse>('/api/vendor-profiles/mine', {
+        vendorName: editForm.vendorName,
+        categoryPreference: editForm.categoryPreference || null,
+        fulfillmentMethod: editForm.fulfillmentMethod || null,
+        operatingHours: editForm.operatingHours || null,
+        locationText: editForm.locationText || null,
+        minimumAmount: editForm.minimumAmount ? Number(editForm.minimumAmount) : null,
+      })
+      setVendorProfile(updated)
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              name: updated.vendorName,
+              category: updated.categoryPreference ?? '—',
+              location: updated.locationText ?? '—',
+            }
+          : prev,
+      )
+      setIsEditing(false)
+    } catch (err) {
+      setEditError(err instanceof ApiError ? err.message : 'Failed to save changes.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   if (!loading && !hasProfile) {
     return (
@@ -314,45 +390,113 @@ function VendorDashboardPage() {
               <div className="panel profile-panel" id="profile">
                 <h2>Vendor Profile</h2>
 
-                {profile && (
-                  <>
-                    <div className="profile-card">
-                      <span className="profile-avatar" aria-hidden="true">
-                        {profile.name
-                          .split(' ')
-                          .slice(0, 2)
-                          .map((word) => word[0])
-                          .join('')}
-                      </span>
-                      <div>
-                        <p className="profile-name">{profile.name}</p>
-                        <p className="profile-meta">{profile.category}</p>
-                        <p className="profile-meta">
-                          {profile.location} · Member since {profile.memberSince}
-                        </p>
-                      </div>
-                    </div>
+                {isEditing && editForm ? (
+                  <form className="profile-edit-form" onSubmit={handleEditSave}>
+                    <label htmlFor="edit-vendorName">Vendor name</label>
+                    <input
+                      id="edit-vendorName"
+                      value={editForm.vendorName}
+                      onChange={updateEditField('vendorName')}
+                      required
+                    />
 
-                    <div className="profile-rating">
-                      <span className="stars" aria-hidden="true">
-                        {[0, 1, 2, 3, 4].map((i) => (
-                          <span
-                            key={i}
-                            className={i < Math.round(profile.rating) ? 'star filled' : 'star'}
-                          >
-                            ★
-                          </span>
-                        ))}
-                      </span>
-                      <span className="rating-value">{profile.rating.toFixed(1)}</span>
-                      <span className="rating-count">({profile.reviews} reviews)</span>
+                    <label htmlFor="edit-category">Category</label>
+                    <input
+                      id="edit-category"
+                      value={editForm.categoryPreference}
+                      onChange={updateEditField('categoryPreference')}
+                    />
+
+                    <label htmlFor="edit-fulfillment">Drop off or delivery</label>
+                    <input
+                      id="edit-fulfillment"
+                      value={editForm.fulfillmentMethod}
+                      onChange={updateEditField('fulfillmentMethod')}
+                    />
+
+                    <label htmlFor="edit-hours">Operating hours</label>
+                    <input
+                      id="edit-hours"
+                      value={editForm.operatingHours}
+                      onChange={updateEditField('operatingHours')}
+                    />
+
+                    <label htmlFor="edit-location">Location</label>
+                    <input
+                      id="edit-location"
+                      value={editForm.locationText}
+                      onChange={updateEditField('locationText')}
+                    />
+
+                    <label htmlFor="edit-minimum">Minimum amount required</label>
+                    <input
+                      id="edit-minimum"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={editForm.minimumAmount}
+                      onChange={updateEditField('minimumAmount')}
+                    />
+
+                    {editError && <p className="profile-edit-error">{editError}</p>}
+
+                    <div className="profile-edit-actions">
+                      <button type="submit" className="btn-primary" disabled={isSaving}>
+                        {isSaving ? 'Saving…' : 'Save'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        disabled={isSaving}
+                        onClick={handleEditCancel}
+                      >
+                        Cancel
+                      </button>
                     </div>
+                  </form>
+                ) : (
+                  <>
+                    {profile && (
+                      <>
+                        <div className="profile-card">
+                          <span className="profile-avatar" aria-hidden="true">
+                            {profile.name
+                              .split(' ')
+                              .slice(0, 2)
+                              .map((word) => word[0])
+                              .join('')}
+                          </span>
+                          <div>
+                            <p className="profile-name">{profile.name}</p>
+                            <p className="profile-meta">{profile.category}</p>
+                            <p className="profile-meta">
+                              {profile.location} · Member since {profile.memberSince}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="profile-rating">
+                          <span className="stars" aria-hidden="true">
+                            {[0, 1, 2, 3, 4].map((i) => (
+                              <span
+                                key={i}
+                                className={i < Math.round(profile.rating) ? 'star filled' : 'star'}
+                              >
+                                ★
+                              </span>
+                            ))}
+                          </span>
+                          <span className="rating-value">{profile.rating.toFixed(1)}</span>
+                          <span className="rating-count">({profile.reviews} reviews)</span>
+                        </div>
+                      </>
+                    )}
+
+                    <button type="button" className="btn-secondary" onClick={handleEditOpen} disabled={!vendorProfile}>
+                      Edit Profile
+                    </button>
                   </>
                 )}
-
-                <button type="button" className="btn-secondary">
-                  Edit Profile
-                </button>
               </div>
 
               <div className="panel activity-panel">

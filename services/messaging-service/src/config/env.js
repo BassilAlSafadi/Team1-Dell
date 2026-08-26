@@ -1,6 +1,6 @@
 require('dotenv').config();
 
-const required = ['MONGODB_URI', 'JWT_SIGNING_KEY'];
+const required = ['MONGODB_URI', 'JWT_SIGNING_KEY', 'INTERNAL_SERVICE_TOKEN'];
 const missing = required.filter((name) => !process.env[name] || process.env[name].startsWith('CHANGE_ME'));
 
 if (missing.length > 0) {
@@ -20,6 +20,9 @@ module.exports = {
     signingKey: process.env.JWT_SIGNING_KEY,
   },
   corsOrigins: (process.env.CORS_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean),
+  // Shared mesh secret. Required: it gates this service's gRPC surface, which answers
+  // questions about conversations and so must never be callable anonymously.
+  internalServiceToken: process.env.INTERNAL_SERVICE_TOKEN,
   grpcPort: Number(process.env.GRPC_PORT) || 6003,
   grpcPeers: {
     auth: process.env.AUTH_GRPC_ADDR,

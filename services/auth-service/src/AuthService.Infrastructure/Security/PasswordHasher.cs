@@ -8,6 +8,13 @@ public interface IPasswordHasher
 {
     string Hash(string password);
     bool Verify(string password, string hash);
+
+    /// <summary>
+    /// Performs the same Argon2id work as Verify and always returns false. Used on the
+    /// no-such-account branch of login so that the response time doesn't reveal whether an email
+    /// is registered.
+    /// </summary>
+    bool VerifyDummy(string password);
 }
 
 /// <summary>
@@ -28,6 +35,10 @@ public class PasswordHasher : IPasswordHasher
         return $"{Convert.ToBase64String(salt)}:{Convert.ToBase64String(hash)}";
     }
 
+    // A fixed, well-formed hash to verify against when no account matched. Generated once at
+    // startup so the dummy path costs exactly what a real verification costs.
+    private static readonly string DummyHash = new PasswordHasher().Hash("dummy-password-for-timing-equalisation");
+
     public bool Verify(string password, string hash)
     {
         var parts = hash.Split(':', 2);
@@ -36,11 +47,29 @@ public class PasswordHasher : IPasswordHasher
             return false;
         }
 
-        var salt = Convert.FromBase64String(parts[0]);
-        var expected = Convert.FromBase64String(parts[1]);
+        // A malformed stored hash is corrupt data, not a crash: FromBase64String would otherwise
+        // throw FormatException and surface as a 500 on an unauthenticated endpoint.
+        byte[] salt;
+        byte[] expected;
+        try
+        {
+            salt = Convert.FromBase64String(parts[0]);
+            expected = Convert.FromBase64String(parts[1]);
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+
         var actual = ComputeHash(password, salt);
 
         return CryptographicOperations.FixedTimeEquals(expected, actual);
+    }
+
+    public bool VerifyDummy(string password)
+    {
+        Verify(password, DummyHash);
+        return false;
     }
 
     private static byte[] ComputeHash(string password, byte[] salt)

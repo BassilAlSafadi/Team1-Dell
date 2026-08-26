@@ -6,6 +6,7 @@ public interface IVendorProfileService
 {
     Task<VendorProfileResponse> CreateAsync(Guid userId, CreateVendorProfileRequest request, CancellationToken ct);
     Task<VendorProfileResponse> GetMineAsync(Guid userId, CancellationToken ct);
+    Task<VendorProfileResponse> UpdateMineAsync(Guid userId, UpdateVendorProfileRequest request, CancellationToken ct);
     Task<IReadOnlyList<VendorProfileResponse>> SearchAsync(string? category, string? city, string? q, CancellationToken ct);
     Task<VendorProfileResponse> GetAsync(Guid vendorId, CancellationToken ct);
 }

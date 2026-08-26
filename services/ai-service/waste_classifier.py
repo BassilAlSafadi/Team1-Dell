@@ -536,7 +536,10 @@ class WasteClassifier:
             model=model,
             temperature=self._temperature,
             google_api_key=api_key,
-            max_retries=3,
+            # gemini_keys.call_with_gemini_fallback() already retries across every model/key
+            # combination the instant a call fails, so the SDK's own retries just add latency
+            # retrying the same already-failing model/key before our fallback gets a turn.
+            max_retries=0,
         )
 
         # Two bindings of the same model: one free to call the RAG tools while it

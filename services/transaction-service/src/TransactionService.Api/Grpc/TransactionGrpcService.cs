@@ -10,8 +10,12 @@ using ContractsWallet = TransactionService.Api.Contracts.WalletResponse;
 namespace TransactionService.Api.Grpc;
 
 // Server-side implementation of transaction.proto's TransactionService — thin 1:1 mirrors of
-// already-tested REST behavior (DealsController.Get, WalletsController.GetMine). Exposed for
-// future gRPC consumers; no caller wires this yet in this pass (see plans/pure-hugging-puzzle.md).
+// already-tested REST behavior (DealsController.Get, WalletsController.GetMine).
+//
+// Authorization is NOT re-implemented here: both methods delegate to the same service-layer calls
+// the REST controllers use, passing the acting user resolved from x-user-id metadata. Previously
+// these methods took an arbitrary id and returned the record unchecked, so the gRPC path silently
+// bypassed every ownership rule the REST path was assumed to enforce.
 public class TransactionGrpcService : Transaction.V1.TransactionService.TransactionServiceBase
 {
     private readonly IDealService _dealService;
@@ -30,10 +34,16 @@ public class TransactionGrpcService : Transaction.V1.TransactionService.Transact
             throw new RpcException(new Status(StatusCode.InvalidArgument, "deal_id must be a valid GUID."));
         }
 
+        var actorUserId = GrpcCaller.RequireUserId(context);
+
         ContractsDeal deal;
         try
         {
-            deal = await _dealService.GetAsync(dealId, context.CancellationToken);
+            deal = await _dealService.GetAsync(dealId, actorUserId, context.CancellationToken);
+        }
+        catch (TransactionDomainException ex) when (ex.StatusCode == HttpStatusCode.Forbidden)
+        {
+            throw new RpcException(new Status(StatusCode.PermissionDenied, ex.Message));
         }
         catch (TransactionDomainException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
         {
@@ -66,12 +76,19 @@ public class TransactionGrpcService : Transaction.V1.TransactionService.Transact
 
     public override async Task<WalletResponse> GetWallet(GetWalletRequest request, ServerCallContext context)
     {
-        // IWalletService only supports lookup by the owning user's id — WalletsController/
-        // IWalletService have no direct wallet-id or arbitrary-user lookup today — so wallet_id
-        // here is interpreted as that owning user's id until a real by-wallet-id lookup exists.
+        // IWalletService only supports lookup by the owning user's id, so wallet_id is
+        // interpreted as that owning user's id until a real by-wallet-id lookup exists.
         if (!Guid.TryParse(request.WalletId, out var userId))
         {
             throw new RpcException(new Status(StatusCode.InvalidArgument, "wallet_id must be a valid GUID (owning user id)."));
+        }
+
+        // A wallet is only ever readable by its owner. This method used to return any user's
+        // balance to any caller that named them.
+        var actorUserId = GrpcCaller.RequireUserId(context);
+        if (actorUserId != userId)
+        {
+            throw new RpcException(new Status(StatusCode.PermissionDenied, "You may only read your own wallet."));
         }
 
         ContractsWallet wallet;

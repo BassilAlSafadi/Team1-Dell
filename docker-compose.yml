@@ -1,8 +1,13 @@
 # Wires all 6 services onto one Docker network so their gRPC (and REST-fallback) addresses
-# resolve by service name. The gateway is now the sole published entry point (decision (e) in
-# gateway/IMPLEMENTATION_PLAN.md) — backend REST ports stay reachable inside this network for
-# the gateway's REST-proxy fallback and for local debugging, but are no longer published to the
-# host. Databases (Postgres via Supabase, MongoDB via Atlas) and the shared Redis instance stay
+# resolve by service name. The gateway is the sole published entry point (decision (e) in
+# gateway/IMPLEMENTATION_PLAN.md): backend REST *and* gRPC ports stay reachable inside this
+# network but are never published to the host. This matters because all end-user authentication
+# lives in the gateway — a published backend port would route around it completely, and the
+# gRPC servers only accept internal-mesh credentials (see Internal__ServiceToken), not user JWTs.
+# To debug a backend port locally, use `docker compose exec` or add a temporary override file
+# rather than re-adding `ports:` here.
+#
+# Databases (Postgres via Supabase, MongoDB via Atlas) and the shared Redis instance stay
 # external per each service's own .env — no local DB/Redis containers here.
 #
 # auth-service, transaction-service and messaging-service all need the repo-root /proto
@@ -43,9 +48,7 @@ services:
       Grpc__Peers__Messaging: "http://messaging-service:6003"
       Grpc__Peers__Notification: "http://notification-service:6004"
       Grpc__Peers__Ai: "http://ai-service:6005"
-    expose: ["8080"]
-    ports:
-      - "6001:6001"
+    expose: ["8080", "6001"]
     networks: [mesh]
 
   transaction-service:
@@ -59,9 +62,9 @@ services:
       Grpc__Peers__Messaging: "http://messaging-service:6003"
       Grpc__Peers__Notification: "http://notification-service:6004"
       Grpc__Peers__Ai: "http://ai-service:6005"
-    expose: ["8080"]
-    ports:
-      - "6002:6002"
+      Internal__MarketplaceRestAddr: "http://marketplace-service:8080"
+    expose: ["8080", "6002"]
+    depends_on: [marketplace-service]
     networks: [mesh]
 
   messaging-service:
@@ -75,9 +78,7 @@ services:
       TRANSACTION_GRPC_ADDR: "transaction-service:6002"
       NOTIFICATION_GRPC_ADDR: "notification-service:6004"
       AI_GRPC_ADDR: "ai-service:6005"
-    expose: ["8080"]
-    ports:
-      - "6003:6003"
+    expose: ["8080", "6003"]
     networks: [mesh]
 
   notification-service:
@@ -89,9 +90,7 @@ services:
       TRANSACTION_GRPC_ADDR: "transaction-service:6002"
       MESSAGING_GRPC_ADDR: "messaging-service:6003"
       AI_GRPC_ADDR: "ai-service:6005"
-    expose: ["8080"]
-    ports:
-      - "6004:6004"
+    expose: ["8080", "6004"]
     networks: [mesh]
 
   ai-service:
@@ -104,9 +103,7 @@ services:
       TRANSACTION_GRPC_ADDR: "transaction-service:6002"
       MESSAGING_GRPC_ADDR: "messaging-service:6003"
       NOTIFICATION_GRPC_ADDR: "notification-service:6004"
-    ports:
-      - "6005:6005"
-      - "7005:7005"
+    expose: ["6005", "7005"]
     networks: [mesh]
 
   marketplace-service:
