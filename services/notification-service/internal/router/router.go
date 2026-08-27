@@ -39,12 +39,16 @@ func New(cfg *config.Config, db *mongo.Database, redisClient *redis.Client) http
 		// read-state changes stay user-scoped.
 		r.With(middleware.RequireInternal(cfg)).Post("/", notificationHandler.Create)
 
-		r.Use(middleware.RequireAuth(cfg))
+		// User-scoped routes. Wrapped in a group so RequireAuth applies only here — chi
+		// forbids r.Use() after a route (the internal POST above) is registered on a mux.
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.RequireAuth(cfg))
 
-		r.Get("/", notificationHandler.List)
-		r.Get("/unread-count", notificationHandler.UnreadCount)
-		r.Post("/read-all", notificationHandler.MarkAllRead)
-		r.Patch("/{id}/read", notificationHandler.MarkRead)
+			r.Get("/", notificationHandler.List)
+			r.Get("/unread-count", notificationHandler.UnreadCount)
+			r.Post("/read-all", notificationHandler.MarkAllRead)
+			r.Patch("/{id}/read", notificationHandler.MarkRead)
+		})
 	})
 
 	return r
