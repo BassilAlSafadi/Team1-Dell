@@ -30,6 +30,13 @@ type Config struct {
 	MessagingGRPCAddr   string
 	AiGRPCAddr          string
 
+	// GRPCUseTLS switches outbound peer dials from plaintext to TLS. Local dev / same-host
+	// docker-compose peers are plaintext; once a peer is only reachable through its own
+	// Cloudflare Tunnel hostname, this must be true or the dial can't reach it (the tunnel
+	// terminates TLS at Cloudflare's edge and proxies to the peer's own plaintext HTTP/2
+	// origin, so it's this client's outbound leg that needs to switch).
+	GRPCUseTLS bool
+
 	// RedisURL is optional — the unread-count cache-aside layer degrades to a
 	// straight Mongo read when this is unset or still a placeholder, so it's
 	// deliberately not in the `required` list below.
@@ -56,6 +63,7 @@ func Load() (*Config, error) {
 		TransactionGRPCAddr: os.Getenv("TRANSACTION_GRPC_ADDR"),
 		MessagingGRPCAddr:   os.Getenv("MESSAGING_GRPC_ADDR"),
 		AiGRPCAddr:          os.Getenv("AI_GRPC_ADDR"),
+		GRPCUseTLS:          getEnv("GRPC_USE_TLS", "false") == "true",
 
 		RedisURL: os.Getenv("REDIS_URL"),
 

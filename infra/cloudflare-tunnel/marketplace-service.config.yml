@@ -1,0 +1,20 @@
+# cloudflared ingress config for marketplace-service.
+# Run: cloudflared tunnel --config marketplace-service.config.yml run
+#
+# Replace <TUNNEL_ID> and <your-domain> below. See ../README.md for the one-time
+# `cloudflared tunnel create` / `tunnel route dns` setup that produces these values.
+#
+# marketplace-service has no gRPC layer — REST only, including the /internal/accounts lookup
+# transaction-service calls (see transaction-service's Internal__MarketplaceRestAddr).
+
+tunnel: <TUNNEL_ID>
+credentials-file: /etc/cloudflared/marketplace-service.json
+
+ingress:
+  # REST API port (ASPNETCORE_URLS, default 8080). Same hostname serves both public listing
+  # traffic and the internal /internal/accounts endpoint (gated by Internal__ServiceToken, not
+  # by a separate route) — see MarketplaceService.Api/Security/InternalOnlyAttribute.cs.
+  - hostname: marketplace.<your-domain>
+    service: http://localhost:8080
+
+  - service: http_status:404

@@ -22,7 +22,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import grpc
 from grpc_health.v1 import health_pb2, health_pb2_grpc
 
-from grpc_clients import PEER_ADDRESSES
+from grpc_clients import PEER_ADDRESSES, sync_channel_for
 
 MESH_HTTP_PORT = int(os.getenv("MESH_HTTP_PORT", "7005"))
 
@@ -31,7 +31,7 @@ _CHECK_TIMEOUT_SECONDS = 3.0
 
 def _check_peer(peer: str, address: str) -> dict:
     try:
-        with grpc.insecure_channel(address) as channel:
+        with sync_channel_for(peer) as channel:
             stub = health_pb2_grpc.HealthStub(channel)
             response = stub.Check(
                 health_pb2.HealthCheckRequest(service=""),

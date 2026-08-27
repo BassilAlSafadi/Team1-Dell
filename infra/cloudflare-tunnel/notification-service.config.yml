@@ -1,0 +1,22 @@
+# cloudflared ingress config for notification-service.
+# Run: cloudflared tunnel --config notification-service.config.yml run
+#
+# Replace <TUNNEL_ID> and <your-domain> below. See ../README.md for the one-time
+# `cloudflared tunnel create` / `tunnel route dns` setup that produces these values.
+
+tunnel: <TUNNEL_ID>
+credentials-file: /etc/cloudflared/notification-service.json
+
+ingress:
+  # gRPC mesh port (GRPC_PORT=6004). h2c:// tells cloudflared to speak cleartext HTTP/2 to the
+  # origin — notification-service's Go grpc.Server keeps listening in plaintext unchanged;
+  # Cloudflare terminates TLS at the edge for the public hostname instead. Peers dial this
+  # hostname over TLS by setting GRPC_USE_TLS=true (see .env.example).
+  - hostname: notification-internal.<your-domain>
+    service: h2c://localhost:6004
+
+  # REST API port (PORT, default 8080).
+  - hostname: notification.<your-domain>
+    service: http://localhost:8080
+
+  - service: http_status:404

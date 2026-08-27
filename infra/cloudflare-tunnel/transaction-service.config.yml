@@ -1,0 +1,22 @@
+# cloudflared ingress config for transaction-service.
+# Run: cloudflared tunnel --config transaction-service.config.yml run
+#
+# Replace <TUNNEL_ID> and <your-domain> below. See ../README.md for the one-time
+# `cloudflared tunnel create` / `tunnel route dns` setup that produces these values.
+
+tunnel: <TUNNEL_ID>
+credentials-file: /etc/cloudflared/transaction-service.json
+
+ingress:
+  # gRPC mesh port (Grpc__Port=6002). h2c:// tells cloudflared to speak cleartext HTTP/2 to
+  # the origin — transaction-service's Kestrel gRPC endpoint is not TLS-terminated locally;
+  # Cloudflare terminates TLS at the edge for the public hostname instead. Peers dial this
+  # hostname over https with GRPC_USE_TLS/an https:// peer URL (see each service's .env.example).
+  - hostname: transaction-internal.<your-domain>
+    service: h2c://localhost:6002
+
+  # REST API port (ASPNETCORE_URLS, default 8080).
+  - hostname: transaction.<your-domain>
+    service: http://localhost:8080
+
+  - service: http_status:404

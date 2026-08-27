@@ -1,0 +1,25 @@
+# cloudflared ingress config for messaging-service.
+# Run: cloudflared tunnel --config messaging-service.config.yml run
+#
+# Replace <TUNNEL_ID> and <your-domain> below. See ../README.md for the one-time
+# `cloudflared tunnel create` / `tunnel route dns` setup that produces these values.
+
+tunnel: <TUNNEL_ID>
+credentials-file: /etc/cloudflared/messaging-service.json
+
+ingress:
+  # gRPC mesh port (GRPC_PORT=6003). h2c:// tells cloudflared to speak cleartext HTTP/2 to the
+  # origin — messaging-service's @grpc/grpc-js server keeps using
+  # grpc.ServerCredentials.createInsecure() unchanged; Cloudflare terminates TLS at the edge
+  # for the public hostname instead. Peers dial this hostname over TLS by setting
+  # GRPC_USE_TLS=true (see .env.example) — that flips their grpc-js channel credentials from
+  # createInsecure() to createSsl().
+  - hostname: messaging-internal.<your-domain>
+    service: h2c://localhost:6003
+
+  # REST + Socket.IO port (PORT, default 8080). Socket.IO's WebSocket upgrade is proxied
+  # transparently by cloudflared/Cloudflare like any other HTTP upgrade.
+  - hostname: messaging.<your-domain>
+    service: http://localhost:8080
+
+  - service: http_status:404

@@ -38,9 +38,24 @@ PEER_ADDRESSES = {
     "notification": NOTIFICATION_GRPC_ADDR,
 }
 
+# TLS when peers are only reachable through their Cloudflare Tunnel hostname (the tunnel
+# terminates TLS at Cloudflare's edge and proxies to the peer's own plaintext HTTP/2 origin,
+# so it's this client's outbound leg that must switch, not the peer's server credentials).
+# Local dev / same-host docker-compose peers stay plaintext.
+GRPC_USE_TLS = os.getenv("GRPC_USE_TLS", "false").lower() == "true"
+
+
+def _channel_credentials() -> grpc.ChannelCredentials | None:
+    return grpc.ssl_channel_credentials() if GRPC_USE_TLS else None
+
+
 # --- async (used by grpc_server.py's servicer methods) ---------------------
 
-_notification_channel = grpc.aio.insecure_channel(NOTIFICATION_GRPC_ADDR)
+_notification_channel = (
+    grpc.aio.secure_channel(NOTIFICATION_GRPC_ADDR, _channel_credentials())
+    if GRPC_USE_TLS
+    else grpc.aio.insecure_channel(NOTIFICATION_GRPC_ADDR)
+)
 notification_stub = notification_pb2_grpc.NotificationServiceStub(_notification_channel)
 
 
@@ -51,4 +66,7 @@ def sync_channel_for(peer: str) -> grpc.Channel:
     ("auth"/"transaction"/"messaging"/"notification"). Callers are responsible
     for closing it (mesh_status.py does this per-request via a `with` block)."""
 
-    return grpc.insecure_channel(PEER_ADDRESSES[peer])
+    address = PEER_ADDRESSES[peer]
+    if GRPC_USE_TLS:
+        return grpc.secure_channel(address, _channel_credentials())
+    return grpc.insecure_channel(address)

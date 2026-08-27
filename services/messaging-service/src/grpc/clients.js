@@ -5,7 +5,12 @@ const { loadProto } = require('./protoLoader');
 const notificationProto = loadProto('notification/v1/notification.proto').notification.v1;
 const healthProto = loadProto('health/v1/health.proto').grpc.health.v1;
 
-const credentials = grpc.credentials.createInsecure();
+// TLS when peers are only reachable through their Cloudflare Tunnel hostname (the tunnel
+// terminates TLS at Cloudflare's edge and proxies to the peer's own plaintext HTTP/2 origin,
+// so it's this client's outbound leg that must switch, not the peer's server credentials).
+const credentials = env.grpcUseTls
+  ? grpc.credentials.createSsl()
+  : grpc.credentials.createInsecure();
 
 // Peers now require the mesh token on every call, so attach it to all outgoing requests.
 function internalTokenInterceptor(options, nextCall) {

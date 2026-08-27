@@ -24,6 +24,11 @@ module.exports = {
   // questions about conversations and so must never be callable anonymously.
   internalServiceToken: process.env.INTERNAL_SERVICE_TOKEN,
   grpcPort: Number(process.env.GRPC_PORT) || 6003,
+  // Peer addresses stay bare host:port (grpc-js takes credentials separately from the
+  // target, unlike Grpc.Net.Client's scheme-driven Uri). Local dev / same-host docker-compose
+  // peers are plaintext; once a peer is only reachable via its own Cloudflare Tunnel hostname,
+  // flip this on so outbound calls negotiate TLS instead of failing to reach it.
+  grpcUseTls: process.env.GRPC_USE_TLS === 'true',
   grpcPeers: {
     auth: process.env.AUTH_GRPC_ADDR,
     transaction: process.env.TRANSACTION_GRPC_ADDR,

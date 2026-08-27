@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"context"
+	"crypto/tls"
 	"net/http"
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 
@@ -36,13 +38,17 @@ func MeshStatus(cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		results := make([]peerStatus, 0, len(peers))
 		for name, addr := range peers {
-			results = append(results, checkPeer(r.Context(), name, addr))
+			results = append(results, checkPeer(r.Context(), name, addr, cfg.GRPCUseTLS))
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"self": "notification-service", "peers": results})
 	}
 }
 
-func checkPeer(ctx context.Context, name, addr string) peerStatus {
+// useTLS switches the dial from plaintext to TLS. Local dev / same-host docker-compose peers
+// are plaintext; once a peer is only reachable through its own Cloudflare Tunnel hostname, this
+// must be true (the tunnel terminates TLS at Cloudflare's edge and proxies to the peer's own
+// plaintext HTTP/2 origin, so it's this client's outbound leg that needs to switch).
+func checkPeer(ctx context.Context, name, addr string, useTLS bool) peerStatus {
 	if addr == "" {
 		return peerStatus{Peer: name, Status: "UNCONFIGURED"}
 	}
@@ -52,7 +58,11 @@ func checkPeer(ctx context.Context, name, addr string) peerStatus {
 	dialCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	transportCreds := insecure.NewCredentials()
+	if useTLS {
+		transportCreds = credentials.NewTLS(&tls.Config{})
+	}
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(transportCreds))
 	if err != nil {
 		return peerStatus{Peer: name, Address: addr, Status: "UNREACHABLE", Error: err.Error()}
 	}
