@@ -4,6 +4,7 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import MyWastePage from './pages/MyWastePage'
+import BusinessOffersPage from './pages/BusinessOffersPage'
 import FindVendorsPage from './pages/FindVendorsPage'
 import TransactionsPage from './pages/TransactionsPage'
 import VendorDashboardPage from './pages/VendorDashboardPage'
@@ -22,6 +23,7 @@ function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/my-waste" element={<ProtectedRoute><MyWastePage /></ProtectedRoute>} />
+      <Route path="/offers" element={<ProtectedRoute><BusinessOffersPage /></ProtectedRoute>} />
       <Route path="/find-vendors" element={<ProtectedRoute><FindVendorsPage /></ProtectedRoute>} />
       <Route path="/transactions" element={<ProtectedRoute><TransactionsPage /></ProtectedRoute>} />
       <Route path="/vendor-dashboard" element={<ProtectedRoute><VendorDashboardPage /></ProtectedRoute>} />

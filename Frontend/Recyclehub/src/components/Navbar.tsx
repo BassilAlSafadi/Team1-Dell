@@ -28,10 +28,10 @@ const navLinksByVariant: Record<NavbarVariant, { label: string; to: string }[]> 
   business: [
     { label: 'Home', to: '/dashboard' },
     { label: 'My Waste', to: '/my-waste' },
+    { label: 'Offers', to: '/offers' },
     { label: 'Find Vendors', to: '/find-vendors' },
     { label: 'Messages', to: '/messages' },
     { label: 'Transactions', to: '/transactions' },
-    { label: 'Impact', to: '/dashboard#impact' },
   ],
   vendor: [
     { label: 'Home', to: '/vendor-dashboard' },

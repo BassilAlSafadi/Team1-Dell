@@ -1,0 +1,133 @@
+.table-state {
+  padding: 24px 0;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.offer-section {
+  margin-top: 28px;
+}
+
+.offer-section:first-of-type {
+  margin-top: 0;
+}
+
+.offer-section-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-h);
+  margin-bottom: 16px;
+}
+
+.offer-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 980px) {
+  .offer-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .offer-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.offer-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 24px;
+}
+
+.offer-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.offer-card-top h2 {
+  font-size: 18px;
+}
+
+.offer-vendor-location {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.offer-status {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.offer-status-pending {
+  background: #fdf3e2;
+  color: #96660c;
+}
+
+.offer-status-accepted {
+  background: var(--green-light);
+  color: var(--green-dark);
+}
+
+.offer-status-rejected,
+.offer-status-withdrawn,
+.offer-status-expired {
+  background: #fbeae9;
+  color: #a3312c;
+}
+
+.offer-listing {
+  margin-top: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.offer-amount {
+  margin-top: 10px;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--green);
+  letter-spacing: -0.5px;
+}
+
+.offer-message {
+  margin-top: 12px;
+  font-size: 14px;
+  font-style: italic;
+  color: var(--text);
+}
+
+.offer-meta {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.offer-card-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.offer-card-actions .btn-primary,
+.offer-card-actions .btn-secondary {
+  align-self: flex-start;
+}
+
+.offer-error {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #c0392b;
+}
