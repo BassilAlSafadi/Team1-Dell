@@ -1,6 +1,6 @@
-import { useState, type FormEvent, type ReactElement } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '../lib/auth'
+import { useAuth, dashboardPathForRoles } from '../lib/auth'
 import { api, ApiError } from '../lib/api'
 import GoogleSignInButton from '../components/GoogleSignInButton'
 import './RegisterPage.css'
@@ -126,7 +126,18 @@ const initialFormState: FormState = {
 
 function RegisterPage() {
   const navigate = useNavigate()
-  const { registerAccount, confirmEmail, login, resendVerification } = useAuth()
+  const { registerAccount, confirmEmail, login, resendVerification, isAuthenticated, user } = useAuth()
+
+  // A returning, already-signed-in visitor who hits /register goes straight to their account.
+  // Captured on mount only, so the in-page Google/verification sub-flows (which sign the user
+  // in and then still need an onboarding step) aren't interrupted mid-way.
+  const wasAuthenticatedOnMount = useRef(isAuthenticated)
+  useEffect(() => {
+    if (wasAuthenticatedOnMount.current) {
+      navigate(dashboardPathForRoles(user?.roles), { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const [role, setRole] = useState<Role | null>(null)
   const selectedRole = roles.find((r) => r.id === role) ?? null
@@ -149,7 +160,7 @@ function RegisterPage() {
   }
 
   const finishAndRedirect = () => {
-    navigate(role === 'vendor' ? '/vendor-dashboard' : '/dashboard')
+    navigate(dashboardPathForRoles(role === 'vendor' ? ['VENDOR'] : ['CORPORATE']))
   }
 
   const handleRegisterSubmit = async (event: FormEvent<HTMLFormElement>) => {

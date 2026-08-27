@@ -2,7 +2,7 @@ import sys
 
 from langchain_chroma import Chroma
 from langchain_core.tools import tool
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEndpointEmbeddings
 
 from chatbot import config
 
@@ -11,7 +11,11 @@ if str(config.SERVICE_ROOT) not in sys.path:
 
 from vendor_search import search_vendors  # noqa: E402  (ai-service root module)
 
-_embeddings = HuggingFaceEmbeddings(model_name=config.EMBEDDING_MODEL_NAME)
+_embeddings = HuggingFaceEndpointEmbeddings(
+    model=config.EMBEDDING_MODEL_NAME,
+    task="feature-extraction",
+    huggingfacehub_api_token=config.HUGGINGFACEHUB_API_TOKEN,
+)
 
 _recycling_guide_store = Chroma(
     collection_name=config.RECYCLING_GUIDE_COLLECTION,

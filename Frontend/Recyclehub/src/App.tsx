@@ -12,12 +12,13 @@ import FindBusinessesPage from './pages/FindBusinessesPage'
 import VendorTransactionsPage from './pages/VendorTransactionsPage'
 import MessagesPage from './pages/MessagesPage'
 import ProtectedRoute from './components/ProtectedRoute'
+import RedirectIfAuthenticated from './components/RedirectIfAuthenticated'
 
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/login" element={<LoginPage />} />
+      <Route path="/" element={<RedirectIfAuthenticated><LandingPage /></RedirectIfAuthenticated>} />
+      <Route path="/login" element={<RedirectIfAuthenticated><LoginPage /></RedirectIfAuthenticated>} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/my-waste" element={<ProtectedRoute><MyWastePage /></ProtectedRoute>} />

@@ -19,8 +19,10 @@ RUN pip install -r requirements.txt
 COPY chatbot/ chatbot/
 COPY db/ db/
 COPY grpcgen/ grpcgen/
-COPY waste_classifier.py waste_recommendations.py vendor_search.py vendors.json ./
+COPY waste_classifier.py waste_recommendations.py vendor_search.py vendor_cache.py vendors.json ./
 COPY identity.py grpc_server.py grpc_clients.py mesh_status.py ./
+# root modules grpc_server.py imports transitively (via chatbot/, waste_*, vendor_cache)
+COPY gemini_keys.py internal_auth.py redis_client.py ./
 
 RUN useradd --create-home appuser \
     && mkdir -p data \

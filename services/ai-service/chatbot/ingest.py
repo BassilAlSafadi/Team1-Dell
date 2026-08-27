@@ -18,7 +18,7 @@ from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_core.messages import HumanMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEndpointEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from chatbot import config
@@ -32,8 +32,14 @@ OCR_PROMPT = (
 )
 
 
-def _get_embeddings() -> HuggingFaceEmbeddings:
-    return HuggingFaceEmbeddings(model_name=config.EMBEDDING_MODEL_NAME)
+def _get_embeddings() -> HuggingFaceEndpointEmbeddings:
+    # Hosted HF Inference API instead of a local model — keeps torch/sentence-transformers
+    # out of the image. Requires HUGGINGFACEHUB_API_TOKEN.
+    return HuggingFaceEndpointEmbeddings(
+        model=config.EMBEDDING_MODEL_NAME,
+        task="feature-extraction",
+        huggingfacehub_api_token=config.HUGGINGFACEHUB_API_TOKEN,
+    )
 
 
 def _ocr_law_pdf(force: bool) -> list[Document]:

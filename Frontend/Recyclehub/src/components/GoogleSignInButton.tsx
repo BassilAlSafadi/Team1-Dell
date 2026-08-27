@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../lib/auth'
+import { useAuth, dashboardPathForRoles } from '../lib/auth'
 import { ApiError } from '../lib/api'
 import './GoogleSignInButton.css'
 
@@ -72,7 +72,7 @@ function GoogleSignInButton({ onError, text = 'continue_with', onSuccess }: Goog
         if (onSuccess) {
           onSuccess(user)
         } else {
-          navigate(user.roles.includes('VENDOR') ? '/vendor-dashboard' : '/dashboard')
+          navigate(dashboardPathForRoles(user.roles))
         }
       } catch (err) {
         onError(err instanceof ApiError ? err.message : 'Google sign-in failed. Please try again.')

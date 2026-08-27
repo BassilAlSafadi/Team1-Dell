@@ -77,6 +77,12 @@ function storeTokens(tokens: StoredTokens | null) {
 
 export type AccountType = 'VENDOR' | 'CORPORATE'
 
+/** The landing page for a signed-in user, by role. Centralised so the login form, the Google
+ * button, the post-verification redirect and the "already signed in" guards all agree. */
+export function dashboardPathForRoles(roles: string[] | undefined): string {
+  return roles?.includes('VENDOR') ? '/vendor-dashboard' : '/dashboard'
+}
+
 type AuthContextValue = {
   user: AuthUser | null
   isAuthenticated: boolean
