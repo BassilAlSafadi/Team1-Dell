@@ -1,0 +1,20 @@
+# Extra override for a 1 GB box (AWS t3.micro free tier). Layer it on top:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.t3micro.yml up -d --build
+#
+# Replaces ai-service (Python + chromadb, too heavy for 1 GB alongside 3 .NET services) with
+# a tiny idle placeholder so the gateway's dependency is still satisfied and the mesh boots.
+# The chatbot / waste-classifier / recommendation gRPC endpoints are unavailable while it's
+# a placeholder; auth, marketplace, transactions, messaging and notifications all work.
+#
+# You MUST add swap on the box first (see deploy/README.md) or the .NET image builds will OOM.
+#
+# To run the real ai-service later (needs a 2 GB box), just drop this -f file.
+
+services:
+  ai-service:
+    build: !reset null
+    image: busybox:1.36
+    command: ["sh", "-c", "echo 'ai-service disabled on t3.micro'; sleep infinity"]
+    environment: !reset null
+    env_file: !reset null
+    expose: !reset null

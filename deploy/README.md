@@ -1,39 +1,58 @@
-# Deploying the backend 24/7 for free (Oracle Cloud Always Free + Cloudflare quick tunnel)
+# Deploying the backend 24/7 (cloud VM + Cloudflare quick tunnel)
 
-Runs all 6 services + the gateway in one `docker compose` stack on a free Oracle ARM VM,
-exposed to the internet through a free Cloudflare quick tunnel (no domain, no Cloudflare
-account). The Vercel frontend points at the tunnel URL.
+Runs the services + gateway in one `docker compose` stack on a cloud VM, exposed to the
+internet through a free Cloudflare quick tunnel (no domain, no Cloudflare account). The
+Vercel frontend points at the tunnel URL.
 
-- **Cost:** $0 ongoing. Oracle needs a debit card at signup for identity verification only
-  (a ~$1 hold that is refunded); Always Free resources are never charged.
 - **Uptime:** 24/7, independent of your laptop.
 - The per-service configs in `infra/cloudflare-tunnel/` are **not** used here — that's a
   future multi-host setup. Here the mesh stays on the internal Docker network and only the
   gateway is exposed.
 
+Two host options below — use **A (AWS free tier)** or **B (Oracle Always Free)**.
+
 ---
 
-## 1. Create the Oracle VM (you do this in the Oracle console)
+## 1A. AWS EC2 free tier (`t3.micro`, 1 GB)
 
-1. Sign up at <https://www.oracle.com/cloud/free/>. Choose your **home region** carefully —
-   Always Free ARM capacity is often exhausted in busy regions (Frankfurt, Ashburn). Pick a
-   smaller one near you if signup offers a choice; you cannot change it later.
-2. Console -> **Compute -> Instances -> Create instance**:
-   - **Image:** Canonical Ubuntu 24.04
-   - **Shape:** `VM.Standard.A1.Flex` (Ampere ARM). Set **2 OCPU / 12 GB** (half the free
-     allowance — enough; you can go 4/24 if capacity allows).
-   - **Networking:** keep "Assign public IPv4 address".
-   - **SSH keys:** upload your public key (or let it generate one and download it).
-   - If you get **"Out of host capacity"**, retry later / another AD, or use a different
-     home region. This is the main friction point.
-3. When it's running, note the **public IP**.
-4. **VCN -> Security List -> default -> Add Ingress Rule** is *not* needed — the gateway is
-   never published; only the tunnel's outbound connection matters. (Add 80/443 ingress only
-   if you later switch to a named tunnel with your own domain.)
+> ⚠️ Card is on file. **Set a $1 monthly budget alert first** (Billing → Budgets) and keep
+> to free-tier limits: `t3.micro` 750 h/month + 30 GB EBS, for 12 months. Stop the instance
+> when you don't need it to avoid burning the 750 hours.
+
+1. **EC2 → Launch instance:**
+   - Name `team1-dell`, AMI **Ubuntu Server 24.04 LTS (x86)**
+   - Type **`t3.micro`**  ·  Key pair: create + download the `.pem`
+   - Storage **30 GB gp3**
+   - Security group: **SSH (22) from My IP only**. No other inbound — the tunnel is outbound.
+2. Note the **public IPv4**. SSH in: `ssh -i team1-dell.pem ubuntu@<public-ip>`
+3. **Add swap** (mandatory on 1 GB or the .NET builds OOM):
+   ```bash
+   sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile
+   sudo mkswap /swapfile && sudo swapon /swapfile
+   echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+   ```
+   On 1 GB, `up.sh` automatically disables `ai-service` (replaced with an idle placeholder)
+   so the 3 .NET services fit. The chatbot / waste-classifier endpoints are off; everything
+   else works. To run the real `ai-service`, move to a 2 GB instance (`t3.small`, ~$15/mo).
+
+Then go to **step 2**.
+
+## 1B. Oracle Cloud Always Free (`VM.Standard.A1.Flex` ARM, up to 4/24)
+
+$0 ongoing; debit card at signup for identity check only. (An NBE card is often declined by
+Oracle — if so, use option 1A or have a teammate sign up.)
+
+1. Sign up at <https://www.oracle.com/cloud/free/>. Pick a **home region** with spare ARM
+   capacity (avoid Frankfurt/Ashburn); you can't change it later.
+2. **Compute → Instances → Create**: Ubuntu 24.04, shape `VM.Standard.A1.Flex`, **2 OCPU /
+   12 GB**, assign public IPv4, upload your SSH key. Retry on "Out of host capacity".
+3. No ingress rule needed (gateway isn't published). With 12 GB, `ai-service` runs normally.
+
+Then go to **step 2**.
 
 ## 2. Bootstrap the VM
 
-SSH in (`ssh ubuntu@<public-ip>`), then:
+SSH in, then:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/BassilAlSafadi/Team1-Dell/main/deploy/vm-bootstrap.sh | bash
@@ -48,13 +67,18 @@ git clone https://github.com/BassilAlSafadi/Team1-Dell.git
 cd Team1-Dell
 ```
 
-The 7 `.env` files are gitignored (they hold DB passwords, JWT keys, API tokens), so copy
-them from your machine — from a local terminal in the repo root:
+The `.env` files are gitignored (they hold DB passwords, JWT keys, API tokens), so copy them
+from your machine — from a local terminal **in the repo root**, with your `.pem` for AWS:
 
 ```bash
-scp gateway/.env ubuntu@<public-ip>:~/Team1-Dell/gateway/.env
-for s in ai auth marketplace messaging notification transaction; do \
-  scp services/$s-service/.env ubuntu@<public-ip>:~/Team1-Dell/services/$s-service/.env; done
+SSH="-i ~/team1-dell.pem"          # AWS; leave empty for Oracle
+HOST=ubuntu@<public-ip>
+
+scp $SSH gateway/.env $HOST:~/Team1-Dell/gateway/.env
+for s in auth marketplace messaging notification transaction; do \
+  scp $SSH services/$s-service/.env $HOST:~/Team1-Dell/services/$s-service/.env; done
+# ai-service/.env only needed on a 2 GB+ box (skipped on t3.micro):
+scp $SSH services/ai-service/.env $HOST:~/Team1-Dell/services/ai-service/.env || true
 ```
 
 Then on the VM, edit `gateway/.env` and add your Vercel URL to `CORS_ORIGINS`:
@@ -69,8 +93,8 @@ CORS_ORIGINS=https://httpsrecycle-hub-drab.vercel.app,http://localhost:5173
 bash deploy/up.sh
 ```
 
-First run builds all images (~10 min on 2 ARM cores). It prints the public gateway URL when
-the tunnel is up:
+First run builds the images (~10–20 min on t3.micro with swap). `up.sh` auto-detects the
+1 GB box and disables `ai-service`. It prints the public gateway URL when the tunnel is up:
 
 ```
  PUBLIC GATEWAY URL:  https://<random-words>.trycloudflare.com
@@ -82,6 +106,9 @@ In the Vercel project settings, set the API base URL env var (e.g. `VITE_API_URL
 `NEXT_PUBLIC_API_URL` — whatever the frontend reads) to that URL, and redeploy the frontend.
 
 ## Operating it
+
+On a **t3.micro**, add `-f docker-compose.t3micro.yml` to every command below, or set:
+`alias dc='docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.t3micro.yml'`
 
 | Task | Command (from repo root on the VM) |
 |---|---|
