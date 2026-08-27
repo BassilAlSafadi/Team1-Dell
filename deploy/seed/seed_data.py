@@ -323,12 +323,15 @@ def seed_postgres(conn_uri: str, vendors: list[dict], corporates: list[dict]) ->
                     (account["user_id"], account["email"], account["created_at"]),
                 )
 
+                # Conflict target is the primary key, not (provider, provider_user_id): the
+                # live database has no unique index on that pair even though the EF model
+                # declares one. identity_id is uuid5-derived, so the PK is just as stable.
                 cur.execute(
                     """
                     INSERT INTO auth_db.auth_identity
                         (identity_id, user_id, provider, provider_user_id, password_hash, created_at)
                     VALUES (%s, %s, 'LOCAL', %s, %s, %s)
-                    ON CONFLICT (provider, provider_user_id) DO UPDATE
+                    ON CONFLICT (identity_id) DO UPDATE
                         SET password_hash = EXCLUDED.password_hash
                     """,
                     (
@@ -477,6 +480,8 @@ def seed_postgres(conn_uri: str, vendors: list[dict], corporates: list[dict]) ->
                     )
                     listing_count += 1
 
+            # review_id is uuid5(vendor, reviewer) so the PK doubles as the natural key the
+            # live schema is missing (0003's review_vendor_reviewer_unique was never applied).
             print(f"  auth_db: upserting reviews for {len(vendors)} vendors…")
             review_count = 0
             for vendor in vendors:
@@ -486,7 +491,7 @@ def seed_postgres(conn_uri: str, vendors: list[dict], corporates: list[dict]) ->
                         INSERT INTO auth_db.review
                             (review_id, vendor_id, reviewer_id, rating, comment, created_at, updated_at)
                         VALUES (%s, %s, %s, %s, %s, %s, now())
-                        ON CONFLICT (vendor_id, reviewer_id) DO UPDATE SET
+                        ON CONFLICT (review_id) DO UPDATE SET
                             rating = EXCLUDED.rating,
                             comment = EXCLUDED.comment,
                             updated_at = now()
