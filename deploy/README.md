@@ -31,9 +31,9 @@ Two host options below — use **A (AWS free tier)** or **B (Oracle Always Free)
    sudo mkswap /swapfile && sudo swapon /swapfile
    echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
    ```
-   On 1 GB, `up.sh` automatically disables `ai-service` (replaced with an idle placeholder)
-   so the 3 .NET services fit. The chatbot / waste-classifier endpoints are off; everything
-   else works. To run the real `ai-service`, move to a 2 GB instance (`t3.small`, ~$15/mo).
+   All 8 containers (6 services + gateway + cloudflared) fit in 1 GB + 4 GB swap. It's tight
+   — first request to each .NET service is slow (~10 s cold) — but stable. `ai-service` runs
+   for real (embeddings go through the HF Inference API, so no local model / torch).
 
 Then go to **step 2**.
 
@@ -46,7 +46,8 @@ Oracle — if so, use option 1A or have a teammate sign up.)
    capacity (avoid Frankfurt/Ashburn); you can't change it later.
 2. **Compute → Instances → Create**: Ubuntu 24.04, shape `VM.Standard.A1.Flex`, **2 OCPU /
    12 GB**, assign public IPv4, upload your SSH key. Retry on "Out of host capacity".
-3. No ingress rule needed (gateway isn't published). With 12 GB, `ai-service` runs normally.
+3. No ingress rule needed (gateway isn't published). More RAM = more headroom; the stack
+   also runs on the 1 GB t3.micro above.
 
 Then go to **step 2**.
 
@@ -75,16 +76,14 @@ SSH="-i ~/team1-dell.pem"          # AWS; leave empty for Oracle
 HOST=ubuntu@<public-ip>
 
 scp $SSH gateway/.env $HOST:~/Team1-Dell/gateway/.env
-for s in auth marketplace messaging notification transaction; do \
+for s in ai auth marketplace messaging notification transaction; do \
   scp $SSH services/$s-service/.env $HOST:~/Team1-Dell/services/$s-service/.env; done
-# ai-service/.env only needed on a 2 GB+ box (skipped on t3.micro):
-scp $SSH services/ai-service/.env $HOST:~/Team1-Dell/services/ai-service/.env || true
 ```
 
 Then on the VM, edit `gateway/.env` and add your Vercel URL to `CORS_ORIGINS`:
 
 ```
-CORS_ORIGINS=https://httpsrecycle-hub-drab.vercel.app,http://localhost:5173
+CORS_ORIGINS=https://recycle-hub-drab.vercel.app,http://localhost:5173
 ```
 
 ## 4. Launch
@@ -93,8 +92,8 @@ CORS_ORIGINS=https://httpsrecycle-hub-drab.vercel.app,http://localhost:5173
 bash deploy/up.sh
 ```
 
-First run builds the images (~10–20 min on t3.micro with swap). `up.sh` auto-detects the
-1 GB box and disables `ai-service`. It prints the public gateway URL when the tunnel is up:
+First run builds the images (~15–25 min on t3.micro with swap — builds run serially). It
+prints the public gateway URL when the tunnel is up:
 
 ```
  PUBLIC GATEWAY URL:  https://<random-words>.trycloudflare.com
@@ -102,21 +101,21 @@ First run builds the images (~10–20 min on t3.micro with swap). `up.sh` auto-d
 
 ## 5. Point the frontend at it
 
-In the Vercel project settings, set the API base URL env var (e.g. `VITE_API_URL` /
-`NEXT_PUBLIC_API_URL` — whatever the frontend reads) to that URL, and redeploy the frontend.
+In the Vercel project settings, set `VITE_API_BASE_URL` to that URL, and redeploy the frontend.
 
 ## Operating it
 
-On a **t3.micro**, add `-f docker-compose.t3micro.yml` to every command below, or set:
-`alias dc='docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.t3micro.yml'`
+`up.sh` writes a `~/dc` helper that wraps `docker compose -f docker-compose.yml -f
+docker-compose.prod.yml`, so from the repo root on the VM:
 
-| Task | Command (from repo root on the VM) |
+| Task | Command |
 |---|---|
-| Status | `docker compose -f docker-compose.yml -f docker-compose.prod.yml ps` |
-| Logs for one service | `docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f auth-service` |
-| Current tunnel URL | `docker compose -f docker-compose.yml -f docker-compose.prod.yml logs cloudflared \| grep trycloudflare` |
+| Status | `~/dc ps` |
+| Logs for one service | `~/dc logs -f auth-service` |
+| Current tunnel URL | `~/dc logs cloudflared \| grep trycloudflare` |
 | Redeploy after `git pull` / `.env` change | `bash deploy/up.sh` |
-| Stop everything | `docker compose -f docker-compose.yml -f docker-compose.prod.yml down` |
+| Rebuild one service | `~/dc build auth-service && ~/dc up -d auth-service` |
+| Stop everything | `~/dc down` |
 
 ### The tunnel URL changes on restart
 
