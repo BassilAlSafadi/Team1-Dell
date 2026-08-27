@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '../lib/auth'
+import { useAuth, dashboardPathForRoles } from '../lib/auth'
 import { ApiError } from '../lib/api'
 import GoogleSignInButton from '../components/GoogleSignInButton'
 import './LoginPage.css'
@@ -19,7 +19,7 @@ function LoginPage() {
     setIsSubmitting(true)
     try {
       const user = await login(email, password)
-      navigate(user.roles.includes('VENDOR') ? '/vendor-dashboard' : '/dashboard')
+      navigate(dashboardPathForRoles(user.roles))
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.')
     } finally {
