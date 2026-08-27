@@ -125,6 +125,12 @@ public class WalletService : IWalletService
 
         OfferService.ValidateCurrency(currency);
 
+        // Adding funds is the first thing a new user does, and they have no wallet row yet —
+        // 404-ing them into a separate "create wallet" call they can't discover made the feature
+        // unreachable. The wallet is an implementation detail of having an account, so open one
+        // on demand, denominated in the currency being added.
+        await EnsureWalletExistsAsync(userId, currency, ct);
+
         return await MutateBalanceAsync(userId, async wallet =>
         {
             // The currency on the ledger row used to be whatever the request body said, so a
@@ -389,7 +395,21 @@ public class WalletService : IWalletService
             UpdatedAt = now
         });
 
-        await _db.SaveChangesAsync(ct);
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            // uq_wallet_user_id lost a race with a concurrent create (two top-ups submitted at
+            // once). The postcondition — a wallet exists — still holds, so carry on; only
+            // re-throw if the failure was something other than that race.
+            _db.ChangeTracker.Clear();
+            if (!await WalletExistsAsync(userId, ct))
+            {
+                throw;
+            }
+        }
     }
 
     private async Task<bool> WalletExistsAsync(Guid userId, CancellationToken ct) =>

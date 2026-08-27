@@ -1,0 +1,86 @@
+/* Shares the modal shell (.modal-overlay/.modal-card/.modal-form/...) with AddWasteModal;
+   only the wallet-specific pieces are defined here. */
+@import './AddWasteModal.css';
+
+.add-funds-balance {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  border-radius: 10px;
+  background: var(--green-light);
+
+  span {
+    font-size: 14px;
+    color: var(--text);
+  }
+
+  strong {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--green);
+  }
+}
+
+/* Keeps the currency label pinned inside the field so the amount reads as money. */
+.add-funds-amount-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  input {
+    flex: 1;
+    padding-right: 64px;
+  }
+}
+
+.add-funds-currency {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  pointer-events: none;
+}
+
+.add-funds-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.add-funds-chip {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+
+  &:hover {
+    border-color: var(--green);
+    color: var(--green);
+  }
+
+  &.is-selected {
+    border-color: var(--green);
+    background: var(--green);
+    color: #fff;
+  }
+}
+
+.add-funds-new-balance {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--green);
+}

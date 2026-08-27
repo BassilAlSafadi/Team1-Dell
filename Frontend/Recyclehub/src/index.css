@@ -119,6 +119,36 @@ button {
   }
 }
 
+/* Wallet balance + "Add Funds" header, shared by the business and vendor transaction pages. */
+.wallet-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+  padding: 24px 32px;
+}
+
+.wallet-panel-label {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.wallet-panel-value {
+  margin-top: 4px;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-h);
+  letter-spacing: -0.5px;
+}
+
+@media (max-width: 768px) {
+  .wallet-panel {
+    padding: 20px 24px;
+  }
+}
+
 .app-main {
   width: 100%;
   max-width: var(--page-max);

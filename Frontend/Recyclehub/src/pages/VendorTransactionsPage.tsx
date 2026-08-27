@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Navbar from '../components/Navbar'
 import ChatbotWidget from '../components/ChatbotWidget'
+import AddFundsModal from '../components/AddFundsModal'
 import { api, ApiError } from '../lib/api'
 import './VendorTransactionsPage.css'
 
@@ -33,6 +34,14 @@ type DealResponse = {
   createdAt: string
   completedAt: string | null
   cancelledAt: string | null
+}
+
+type WalletResponse = {
+  walletId: string
+  userId: string
+  balance: number
+  currency: string
+  status: string
 }
 
 type WalletTransactionResponse = {
@@ -99,6 +108,16 @@ async function fetchWalletTransactions(): Promise<WalletTransactionResponse[]> {
   }
 }
 
+/** 404 means the wallet hasn't been opened yet — that's a zero balance, not an error. */
+async function fetchWallet(): Promise<WalletResponse | null> {
+  try {
+    return await api.get<WalletResponse>('/api/wallets/me')
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null
+    throw err
+  }
+}
+
 function mergeRows(deals: DealResponse[], walletTx: WalletTransactionResponse[]): TransactionRow[] {
   const dealRows = deals.map((deal) => ({
     id: `deal-${deal.dealId}`,
@@ -130,53 +149,48 @@ function VendorTransactionsPage() {
   const [hasProfile, setHasProfile] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [rows, setRows] = useState<TransactionRow[]>([])
+  const [balance, setBalance] = useState<number | null>(null)
+  const [currency, setCurrency] = useState('EGP')
+  const [isAddFundsOpen, setIsAddFundsOpen] = useState(false)
 
-  useEffect(() => {
-    let cancelled = false
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
 
-    async function load() {
-      setLoading(true)
-      setError(null)
-
-      try {
-        await api.get<VendorProfileResponse>('/api/vendor-profiles/mine')
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 404) {
-          if (!cancelled) {
-            setHasProfile(false)
-            setLoading(false)
-          }
-          return
-        }
-        if (!cancelled) {
-          setError(err instanceof ApiError ? err.message : 'Failed to load transactions.')
-          setLoading(false)
-        }
+    try {
+      await api.get<VendorProfileResponse>('/api/vendor-profiles/mine')
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
+        setHasProfile(false)
+        setLoading(false)
         return
       }
-
-      if (!cancelled) setHasProfile(true)
-
-      try {
-        const [deals, walletTx] = await Promise.all([
-          fetchMyDeals(),
-          fetchWalletTransactions(),
-        ])
-        if (!cancelled) setRows(mergeRows(deals, walletTx))
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof ApiError ? err.message : 'Failed to load transactions.')
-        }
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
+      setError(err instanceof ApiError ? err.message : 'Failed to load transactions.')
+      setLoading(false)
+      return
     }
 
-    load()
-    return () => {
-      cancelled = true
+    setHasProfile(true)
+
+    try {
+      const [deals, walletTx, wallet] = await Promise.all([
+        fetchMyDeals(),
+        fetchWalletTransactions(),
+        fetchWallet(),
+      ])
+      setRows(mergeRows(deals, walletTx))
+      setBalance(wallet?.balance ?? 0)
+      if (wallet) setCurrency(wallet.currency)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to load transactions.')
+    } finally {
+      setLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
 
   return (
     <div className="page">
@@ -186,6 +200,23 @@ function VendorTransactionsPage() {
         <div className="page-header">
           <h1>Transactions</h1>
           <p>Your full history of completed, pending, and cancelled pickups.</p>
+        </div>
+
+        <div className="panel wallet-panel">
+          <div className="wallet-panel-balance">
+            <p className="wallet-panel-label">Wallet balance</p>
+            <p className="wallet-panel-value">
+              {balance === null
+                ? '…'
+                : `${balance.toLocaleString('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })} ${currency}`}
+            </p>
+          </div>
+          <button type="button" className="btn-primary" onClick={() => setIsAddFundsOpen(true)}>
+            Add Funds
+          </button>
         </div>
 
         <div className="panel vendor-transactions-panel">
@@ -231,6 +262,13 @@ function VendorTransactionsPage() {
           )}
         </div>
       </main>
+
+      {isAddFundsOpen && (
+        <AddFundsModal
+          onClose={() => setIsAddFundsOpen(false)}
+          onFunded={() => load()}
+        />
+      )}
 
       <ChatbotWidget />
     </div>
