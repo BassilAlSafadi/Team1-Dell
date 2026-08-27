@@ -1,0 +1,25 @@
+# Production override: runs the whole mesh on one host + a Cloudflare "quick tunnel"
+# that exposes ONLY the gateway to the public internet.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# The mesh (auth<->transaction<->messaging<->notification<->ai, gateway->all) stays entirely
+# on the internal `mesh` Docker network - no per-service tunnels, no TLS between services,
+# so the committed infra/cloudflare-tunnel/*.config.yml files and the GRPC_USE_TLS flags are
+# NOT used in this single-host setup. They're only for a future multi-host deployment.
+#
+# Get the public URL after `up`:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml logs cloudflared | grep trycloudflare
+#
+# The URL is a random *.trycloudflare.com and is stable as long as this container keeps
+# running. If it restarts, grab the new URL from the logs and update the frontend's API base
+# URL env var on Vercel. For a permanent hostname, switch `command:` to a named tunnel
+# (`tunnel run <name>`) with a token once you have a domain on Cloudflare.
+
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --url http://gateway:8080
+    depends_on: [gateway]
+    networks: [mesh]
