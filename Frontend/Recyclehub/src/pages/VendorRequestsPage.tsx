@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import ChatbotWidget from '../components/ChatbotWidget'
+import MakeOfferModal from '../components/MakeOfferModal'
 import { api, ApiError } from '../lib/api'
 import './VendorRequestsPage.css'
 
@@ -105,10 +106,10 @@ function VendorRequestsPage() {
   const [error, setError] = useState<string | null>(null)
   const [listings, setListings] = useState<ListingResponse[]>([])
   const [businessInfo, setBusinessInfo] = useState<Record<string, BusinessInfo>>({})
-  const [vendorId, setVendorId] = useState<string | null>(null)
   const [vendorProfileMissing, setVendorProfileMissing] = useState(false)
   const [offerStatus, setOfferStatus] = useState<Record<string, OfferStatus>>({})
   const [messageStatus, setMessageStatus] = useState<Record<string, MessageStatus>>({})
+  const [offerModalListing, setOfferModalListing] = useState<ListingResponse | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -117,12 +118,12 @@ function VendorRequestsPage() {
       setLoading(true)
       setError(null)
       try {
-        const [listingsRes, vendorProfileResult] = await Promise.all([
+        const [listingsRes, hasVendorProfile] = await Promise.all([
           api.get<ListingResponse[]>('/api/listings', { status: 'ACTIVE' }),
           api.get<VendorProfileResponse>('/api/vendor-profiles/mine').then(
-            (p) => ({ ok: true as const, vendorId: p.vendorId }),
+            () => true,
             (err) => {
-              if (err instanceof ApiError && err.status === 404) return { ok: false as const }
+              if (err instanceof ApiError && err.status === 404) return false
               throw err
             },
           ),
@@ -131,13 +132,7 @@ function VendorRequestsPage() {
         if (cancelled) return
 
         setListings(listingsRes)
-        if (vendorProfileResult.ok) {
-          setVendorId(vendorProfileResult.vendorId)
-          setVendorProfileMissing(false)
-        } else {
-          setVendorId(null)
-          setVendorProfileMissing(true)
-        }
+        setVendorProfileMissing(!hasVendorProfile)
 
         const corporateIds = listingsRes
           .map((listing) => listing.ownerCorporateId)
@@ -159,21 +154,24 @@ function VendorRequestsPage() {
     }
   }, [])
 
-  async function handleAccept(listing: ListingResponse) {
-    if (!vendorId || !listing.ownerCorporateId) return
+  async function submitOffer(listing: ListingResponse, amount: number, currency: string, message: string) {
+    if (!listing.ownerCorporateId) return
     setOfferStatus((prev) => ({ ...prev, [listing.listingId]: 'sending' }))
     try {
-      // buyerId is no longer sent: the server derives it from the signed-in user's own vendor
-      // account. Accepting it from the client let anyone make an offer as anyone.
+      // buyerId is derived server-side from the signed-in vendor. The vendor sets the amount;
+      // the listing's expectedAmount is only a starting suggestion in the modal.
       await api.post('/api/offers', {
         listingId: listing.listingId,
         sellerId: listing.ownerCorporateId,
-        offeredAmount: listing.expectedAmount ?? 0,
-        currency: listing.currency ?? 'EGP',
+        offeredAmount: amount,
+        currency,
+        message: message || undefined,
       })
       setOfferStatus((prev) => ({ ...prev, [listing.listingId]: 'sent' }))
-    } catch {
+      setOfferModalListing(null)
+    } catch (err) {
       setOfferStatus((prev) => ({ ...prev, [listing.listingId]: 'error' }))
+      throw err
     }
   }
 
@@ -260,7 +258,7 @@ function VendorRequestsPage() {
                         className="btn-primary"
                         disabled={status === 'sending' || status === 'sent' || Boolean(disabledReason)}
                         title={disabledReason}
-                        onClick={() => handleAccept(listing)}
+                        onClick={() => setOfferModalListing(listing)}
                       >
                         {status === 'sent'
                           ? 'Offer Sent'
@@ -268,7 +266,7 @@ function VendorRequestsPage() {
                             ? 'Sending…'
                             : status === 'error'
                               ? 'Failed — Retry'
-                              : 'Accept Request'}
+                              : 'Make Offer'}
                       </button>
                       <button
                         type="button"
@@ -291,6 +289,16 @@ function VendorRequestsPage() {
           </>
         )}
       </main>
+
+      {offerModalListing && (
+        <MakeOfferModal
+          listingTitle={`${offerModalListing.categoryName || offerModalListing.title} · ${offerModalListing.quantity} ${offerModalListing.unit}`}
+          suggestedAmount={offerModalListing.expectedAmount}
+          currency={offerModalListing.currency ?? 'EGP'}
+          onClose={() => setOfferModalListing(null)}
+          onSubmit={(amount, currency, message) => submitOffer(offerModalListing, amount, currency, message)}
+        />
+      )}
 
       <ChatbotWidget />
     </div>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Navbar from '../components/Navbar'
 import ChatbotWidget from '../components/ChatbotWidget'
 import AddFundsModal from '../components/AddFundsModal'
+import DealsPanel from '../components/DealsPanel'
 import { api, ApiError } from '../lib/api'
 import './VendorTransactionsPage.css'
 
@@ -149,6 +150,8 @@ function VendorTransactionsPage() {
   const [hasProfile, setHasProfile] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [rows, setRows] = useState<TransactionRow[]>([])
+  const [deals, setDeals] = useState<DealResponse[]>([])
+  const [walletTx, setWalletTx] = useState<WalletTransactionResponse[]>([])
   const [balance, setBalance] = useState<number | null>(null)
   const [currency, setCurrency] = useState('EGP')
   const [isAddFundsOpen, setIsAddFundsOpen] = useState(false)
@@ -173,12 +176,14 @@ function VendorTransactionsPage() {
     setHasProfile(true)
 
     try {
-      const [deals, walletTx, wallet] = await Promise.all([
+      const [dealsResult, walletTxResult, wallet] = await Promise.all([
         fetchMyDeals(),
         fetchWalletTransactions(),
         fetchWallet(),
       ])
-      setRows(mergeRows(deals, walletTx))
+      setDeals(dealsResult)
+      setWalletTx(walletTxResult)
+      setRows(mergeRows(dealsResult, walletTxResult))
       setBalance(wallet?.balance ?? 0)
       if (wallet) setCurrency(wallet.currency)
     } catch (err) {
@@ -218,6 +223,10 @@ function VendorTransactionsPage() {
             Add Funds
           </button>
         </div>
+
+        {!loading && hasProfile && (
+          <DealsPanel role="buyer" deals={deals} walletTx={walletTx} onChanged={load} />
+        )}
 
         <div className="panel vendor-transactions-panel">
           {loading ? (

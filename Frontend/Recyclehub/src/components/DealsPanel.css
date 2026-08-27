@@ -1,0 +1,75 @@
+.deals-panel {
+  margin-bottom: 24px;
+}
+
+.deals-panel-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-h);
+  margin-bottom: 16px;
+}
+
+.deals-panel-error {
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: #c0392b;
+}
+
+.deals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.deal-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 16px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid var(--border);
+}
+
+.deal-row-party {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.deal-row-meta {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.deal-tag-paid {
+  color: var(--green-dark);
+  font-weight: 600;
+}
+
+.deal-tag-unpaid {
+  color: #96660c;
+  font-weight: 600;
+}
+
+.deal-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.deal-row-waiting {
+  font-size: 13px;
+  color: var(--text);
+  font-style: italic;
+}
+
+.deal-row-actions .btn-primary,
+.deal-row-actions .btn-secondary {
+  padding: 8px 16px;
+  font-size: 14px;
+}
