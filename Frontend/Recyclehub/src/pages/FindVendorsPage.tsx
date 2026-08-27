@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import ChatbotWidget from '../components/ChatbotWidget'
 import { api, ApiError } from '../lib/api'
 import './FindVendorsPage.css'
+
+const MATERIALS = ['Plastic', 'Glass', 'Metal', 'Cardboard', 'Paper', 'Other']
 
 type VendorProfileResponse = {
   vendorId: string
@@ -53,43 +55,52 @@ function FindVendorsPage() {
   const [contactState, setContactState] = useState<Record<string, ContactState>>({})
   const [contactError, setContactError] = useState<Record<string, string>>({})
 
+  const [query, setQuery] = useState('')
+  const [city, setCity] = useState('')
+  const [category, setCategory] = useState('')
+
+  async function search(q: string, cityFilter: string, categoryFilter: string) {
+    setIsLoading(true)
+    setError(null)
+    try {
+      // GET /api/vendor-profiles?q=&city=&category= — VendorProfileService.SearchAsync
+      // filters by vendor name (q), location (city, ILIKE) and CategoryPreference.
+      const data = await api.get<VendorProfileResponse[]>('/api/vendor-profiles', {
+        q: q || undefined,
+        city: cityFilter || undefined,
+        category: categoryFilter || undefined,
+      })
+      setVendors(data)
+
+      const ratingEntries = await Promise.all(
+        data.map(async (vendor) => {
+          try {
+            const profile = await api.get<AuthVendorProfile>(`/api/vendors/${vendor.userId}/profile`)
+            return [
+              vendor.userId,
+              { averageRating: profile.averageRating, reviewCount: profile.reviewCount },
+            ] as const
+          } catch {
+            return [vendor.userId, null] as const
+          }
+        }),
+      )
+      setRatings(Object.fromEntries(ratingEntries))
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to load vendors.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   useEffect(() => {
-    let cancelled = false
-
-    async function load() {
-      setIsLoading(true)
-      setError(null)
-      try {
-        const data = await api.get<VendorProfileResponse[]>('/api/vendor-profiles')
-        if (cancelled) return
-        setVendors(data)
-
-        const ratingEntries = await Promise.all(
-          data.map(async (vendor) => {
-            try {
-              const profile = await api.get<AuthVendorProfile>(`/api/vendors/${vendor.userId}/profile`)
-              return [vendor.userId, { averageRating: profile.averageRating, reviewCount: profile.reviewCount }] as const
-            } catch {
-              return [vendor.userId, null] as const
-            }
-          }),
-        )
-        if (cancelled) return
-        setRatings(Object.fromEntries(ratingEntries))
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof ApiError ? err.message : 'Failed to load vendors.')
-        }
-      } finally {
-        if (!cancelled) setIsLoading(false)
-      }
-    }
-
-    load()
-    return () => {
-      cancelled = true
-    }
+    search('', '', '')
   }, [])
+
+  const handleSearchSubmit = (event: FormEvent) => {
+    event.preventDefault()
+    search(query.trim(), city.trim(), category)
+  }
 
   const handleContact = async (vendor: VendorProfileResponse) => {
     setContactState((prev) => ({ ...prev, [vendor.userId]: 'loading' }))
@@ -125,6 +136,38 @@ function FindVendorsPage() {
           <h1>Find Vendors</h1>
           <p>Registered local vendors ready to buy your recyclables.</p>
         </div>
+
+        <form className="business-search" onSubmit={handleSearchSubmit}>
+          <input
+            type="text"
+            placeholder="Search by vendor name…"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            aria-label="Search by vendor name"
+          />
+          <input
+            type="text"
+            placeholder="City or location…"
+            value={city}
+            onChange={(event) => setCity(event.target.value)}
+            aria-label="Filter by city"
+          />
+          <select
+            value={category}
+            onChange={(event) => setCategory(event.target.value)}
+            aria-label="Filter by material"
+          >
+            <option value="">All materials</option>
+            {MATERIALS.map((material) => (
+              <option key={material} value={material}>
+                {material}
+              </option>
+            ))}
+          </select>
+          <button type="submit" className="btn-primary">
+            Search
+          </button>
+        </form>
 
         {isLoading ? (
           <p className="vendor-status">Loading vendors…</p>

@@ -4,6 +4,42 @@
   color: var(--text);
 }
 
+.business-search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 24px;
+
+  input,
+  select {
+    flex: 1;
+    min-width: 180px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--text-h);
+    transition: border-color 0.2s, box-shadow 0.2s;
+
+    &:focus {
+      outline: none;
+      border-color: var(--green);
+      box-shadow: 0 0 0 3px var(--green-light);
+    }
+  }
+
+  select {
+    flex: 0 0 auto;
+    cursor: pointer;
+  }
+
+  .btn-primary {
+    flex: 0 0 auto;
+  }
+}
+
 .vendor-status-error {
   color: #b3261e;
 }
