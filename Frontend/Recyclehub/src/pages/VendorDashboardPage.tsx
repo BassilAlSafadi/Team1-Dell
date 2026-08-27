@@ -1,10 +1,13 @@
-import { useEffect, useState, type FormEvent, type ReactElement } from 'react'
+import { useCallback, useEffect, useState, type FormEvent, type ReactElement } from 'react'
 import { Link } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import ChatbotWidget from '../components/ChatbotWidget'
+import AddFundsModal from '../components/AddFundsModal'
 import { api, ApiError } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import './VendorDashboardPage.css'
+
+type WalletResponse = { balance: number; currency: string }
 
 type VendorProfileResponse = {
   vendorId: string
@@ -162,57 +165,52 @@ function VendorDashboardPage() {
   const [editForm, setEditForm] = useState<EditForm | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+  const [isAddFundsOpen, setIsAddFundsOpen] = useState(false)
 
-  useEffect(() => {
-    let cancelled = false
+  const loadDashboard = useCallback(async () => {
+    setLoading(true)
+    setError(null)
 
-    async function load() {
-      setLoading(true)
-      setError(null)
-
-      let vendorProfile: VendorProfileResponse
-      try {
-        vendorProfile = await api.get<VendorProfileResponse>('/api/vendor-profiles/mine')
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 404) {
-          if (!cancelled) {
-            setHasProfile(false)
-            setLoading(false)
-          }
-          return
-        }
-        if (!cancelled) {
-          setError(err instanceof ApiError ? err.message : 'Failed to load your dashboard.')
-          setLoading(false)
-        }
+    let vendorProfile: VendorProfileResponse
+    try {
+      vendorProfile = await api.get<VendorProfileResponse>('/api/vendor-profiles/mine')
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
+        setHasProfile(false)
+        setLoading(false)
         return
       }
+      setError(err instanceof ApiError ? err.message : 'Failed to load your dashboard.')
+      setLoading(false)
+      return
+    }
 
-      if (!cancelled) setHasProfile(true)
+    setHasProfile(true)
 
-      try {
-        const [offers, deals, authProfile] = await Promise.all([
-          api.get<OfferResponse[]>('/api/offers/mine', { role: 'BUYER' }).catch((err) => {
-            if (err instanceof ApiError && err.status === 404) return [] as OfferResponse[]
-            throw err
-          }),
-          api.get<DealResponse[]>('/api/deals/mine').catch((err) => {
-            if (err instanceof ApiError && err.status === 404) return [] as DealResponse[]
-            throw err
-          }),
-          user
-            ? api.get<AuthVendorProfileResponse>(`/api/vendors/${user.userId}/profile`).catch((err) => {
-                if (err instanceof ApiError) return null
-                throw err
-              })
-            : Promise.resolve(null),
-        ])
-
-        if (cancelled) return
+    try {
+      const [offers, deals, authProfile, wallet] = await Promise.all([
+        api.get<OfferResponse[]>('/api/offers/mine', { role: 'BUYER' }).catch((err) => {
+          if (err instanceof ApiError && err.status === 404) return [] as OfferResponse[]
+          throw err
+        }),
+        api.get<DealResponse[]>('/api/deals/mine').catch((err) => {
+          if (err instanceof ApiError && err.status === 404) return [] as DealResponse[]
+          throw err
+        }),
+        user
+          ? api.get<AuthVendorProfileResponse>(`/api/vendors/${user.userId}/profile`).catch((err) => {
+              if (err instanceof ApiError) return null
+              throw err
+            })
+          : Promise.resolve(null),
+        // 404 = wallet not opened yet -> zero balance, not an error.
+        api.get<WalletResponse>('/api/wallets/me').catch((err) => {
+          if (err instanceof ApiError && err.status === 404) return null
+          throw err
+        }),
+      ])
 
         const completedDeals = deals.filter((deal) => deal.status === 'COMPLETED')
-        const earningsCurrency = completedDeals[0]?.currency ?? 'EGP'
-        const totalEarnings = completedDeals.reduce((sum, deal) => sum + deal.agreedAmount, 0)
 
         setStats([
           {
@@ -221,8 +219,8 @@ function VendorDashboardPage() {
             icon: requestsFulfilledIcon,
           },
           {
-            label: 'Total Earnings',
-            value: plainAmount(totalEarnings, earningsCurrency),
+            label: 'Wallet Balance',
+            value: plainAmount(wallet?.balance ?? 0, wallet?.currency ?? 'EGP'),
             icon: totalEarningsIcon,
           },
           {
@@ -263,20 +261,16 @@ function VendorDashboardPage() {
           rating: authProfile?.averageRating ?? 0,
           reviews: authProfile?.reviewCount ?? 0,
         })
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof ApiError ? err.message : 'Failed to load your dashboard.')
-        }
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    load()
-    return () => {
-      cancelled = true
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to load your dashboard.')
+    } finally {
+      setLoading(false)
     }
   }, [user])
+
+  useEffect(() => {
+    loadDashboard()
+  }, [loadDashboard])
 
   const handleEditOpen = () => {
     if (!vendorProfile) return
@@ -361,6 +355,9 @@ function VendorDashboardPage() {
             <Link to="/vendor-transactions" className="btn-secondary">
               View Transactions
             </Link>
+            <button type="button" className="btn-secondary" onClick={() => setIsAddFundsOpen(true)}>
+              Add Funds
+            </button>
           </div>
         </section>
 
@@ -526,6 +523,13 @@ function VendorDashboardPage() {
           </>
         )}
       </main>
+
+      {isAddFundsOpen && (
+        <AddFundsModal
+          onClose={() => setIsAddFundsOpen(false)}
+          onFunded={() => loadDashboard()}
+        />
+      )}
 
       <ChatbotWidget />
     </div>

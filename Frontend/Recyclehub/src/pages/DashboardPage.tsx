@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import ChatbotWidget from '../components/ChatbotWidget'
 import AddWasteModal from '../components/AddWasteModal'
+import AddFundsModal from '../components/AddFundsModal'
 import { api, ApiError } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import './DashboardPage.css'
@@ -140,6 +141,7 @@ function DashboardPage() {
   const scannerRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [isAddFundsOpen, setIsAddFundsOpen] = useState(false)
   const [previewImage, setPreviewImage] = useState<string | null>(null)
 
   const [categories, setCategories] = useState<CategoryResponse[]>([])
@@ -274,7 +276,7 @@ function DashboardPage() {
   const co2eEstimate = totalKg * 0.5
   const stats = [
     { label: 'Total Waste Recycled', value: `${totalKg.toFixed(1)} kg` },
-    { label: 'Total Earnings', value: `${walletBalance.toFixed(2)} ${walletCurrency}` },
+    { label: 'Wallet Balance', value: `${walletBalance.toFixed(2)} ${walletCurrency}` },
     { label: 'CO2e Saved (est.)', value: `${co2eEstimate.toFixed(1)} kg` },
     { label: 'Transactions', value: `${deals.length}` },
   ]
@@ -339,6 +341,13 @@ function DashboardPage() {
               onClick={() => setIsAddModalOpen(true)}
             >
               Add Waste Manually
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => setIsAddFundsOpen(true)}
+            >
+              Add Funds
             </button>
           </div>
         </section>
@@ -518,6 +527,10 @@ function DashboardPage() {
 
       {isAddModalOpen && (
         <AddWasteModal onClose={() => setIsAddModalOpen(false)} onCreated={fetchDashboardData} />
+      )}
+
+      {isAddFundsOpen && (
+        <AddFundsModal onClose={() => setIsAddFundsOpen(false)} onFunded={() => fetchDashboardData()} />
       )}
 
       <ChatbotWidget />
