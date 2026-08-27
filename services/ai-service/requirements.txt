@@ -8,6 +8,9 @@ pymupdf
 python-dotenv
 pymongo
 
+# waste_classifier.py preprocesses the uploaded image before sending it to Gemini.
+Pillow
+
 # gRPC server (ai-service's first long-running process) + clients to the other
 # 4 services. Pinned to grpcio 1.71.x / protobuf 5.x — newer grpcio-tools
 # (1.8x) forces protobuf>=7, which conflicts with several other deps already
