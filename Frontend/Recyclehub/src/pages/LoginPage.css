@@ -231,6 +231,74 @@
   }
 }
 
+/* ---- email verification step ---- */
+
+.link-back {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-bottom: 8px;
+  color: var(--green-dark);
+  font-weight: 600;
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.verify-title {
+  align-self: flex-start;
+  margin: 4px 0 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.verify-hint {
+  align-self: flex-start;
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.verify-code-input {
+  text-align: center;
+  font-size: 28px !important;
+  font-weight: 700;
+  letter-spacing: 12px;
+  padding: 14px 16px !important;
+
+  &::placeholder {
+    letter-spacing: 12px;
+    color: var(--border);
+    font-weight: 700;
+  }
+}
+
+.link-resend {
+  margin-top: 14px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--green-dark);
+  font-weight: 600;
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    text-decoration: underline;
+  }
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+}
+
 .auth-divider {
   display: flex;
   align-items: center;
