@@ -5,11 +5,11 @@ namespace TransactionService.Api.Contracts;
 // BuyerId is deliberately absent: it is derived from the authenticated caller's marketplace
 // accounts. Accepting it from the body allowed forging an offer on another account's behalf.
 public record CreateOfferRequest(
-    [property: Required] Guid ListingId,
-    [property: Required] Guid SellerId,
-    [property: Range(0.01, 99_999_999.99)] decimal OfferedAmount,
-    [property: Required, StringLength(3, MinimumLength = 3)] string Currency,
-    [property: StringLength(2000)] string? Message,
+    [Required] Guid ListingId,
+    [Required] Guid SellerId,
+    [Range(0.01, 99_999_999.99)] decimal OfferedAmount,
+    [Required, StringLength(3, MinimumLength = 3)] string Currency,
+    [StringLength(2000)] string? Message,
     DateTimeOffset? ExpiresAt);
 
 public record OfferResponse(

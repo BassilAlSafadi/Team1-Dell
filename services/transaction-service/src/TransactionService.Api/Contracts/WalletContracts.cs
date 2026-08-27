@@ -4,19 +4,24 @@ namespace TransactionService.Api.Contracts;
 
 // numeric(14,2) in Postgres caps the magnitude; Range keeps an out-of-range amount a clean 400
 // instead of a constraint violation surfacing as a 500.
+//
+// Validation attributes bind to the primary-constructor *parameter*, never [property:] — MVC
+// throws InvalidOperationException ("validation metadata ... that will be ignored") the moment
+// it validates a record carrying them on properties, so every endpoint taking one of these
+// bodies 500s before its handler runs.
 public record CreateWalletRequest(
-    [property: Required, StringLength(3, MinimumLength = 3)] string Currency);
+    [Required, StringLength(3, MinimumLength = 3)] string Currency);
 
 public record TopUpRequest(
-    [property: Range(0.01, 99_999_999.99)] decimal Amount,
-    [property: Required, StringLength(3, MinimumLength = 3)] string Currency,
+    [Range(0.01, 99_999_999.99)] decimal Amount,
+    [Required, StringLength(3, MinimumLength = 3)] string Currency,
     Guid? PaymentMethodId);
 
 public record WithdrawRequest(
-    [property: Range(0.01, 99_999_999.99)] decimal Amount);
+    [Range(0.01, 99_999_999.99)] decimal Amount);
 
 public record PayForDealRequest(
-    [property: Required] Guid DealId);
+    [Required] Guid DealId);
 
 public record WalletResponse(
     Guid WalletId,

@@ -3,8 +3,8 @@ using System.ComponentModel.DataAnnotations;
 namespace TransactionService.Api.Contracts;
 
 public record TransitionDealRequest(
-    [property: Required, StringLength(32)] string NewStatus,
-    [property: StringLength(500)] string? Reason);
+    [Required, StringLength(32)] string NewStatus,
+    [StringLength(500)] string? Reason);
 
 public record DealResponse(
     Guid DealId,
