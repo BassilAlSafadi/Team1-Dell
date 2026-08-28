@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import Navbar from '../components/Navbar'
 import ChatbotWidget from '../components/ChatbotWidget'
+import RetryState from '../components/RetryState'
 import { api, ApiError } from '../lib/api'
+import { toast } from '../lib/toast'
 import './BusinessOffersPage.css'
 
 type OfferResponse = {
@@ -154,6 +156,7 @@ function BusinessOffersPage() {
         delete next[offerId]
         return next
       })
+      toast.success(action === 'accept' ? 'Offer accepted.' : 'Offer rejected.')
     } catch (err) {
       setActions((prev) => ({ ...prev, [offerId]: 'error' }))
       setError(err instanceof ApiError ? err.message : 'Could not update the offer.')
@@ -231,7 +234,7 @@ function BusinessOffersPage() {
         ) : !hasProfile ? (
           <p className="table-state">Complete your business profile to receive offers.</p>
         ) : error ? (
-          <p className="table-state">{error}</p>
+          <RetryState message={error} onRetry={load} />
         ) : rows.length === 0 ? (
           <p className="table-state">
             No offers yet. When a vendor offers on one of your listings, it shows up here.

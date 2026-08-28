@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { ApiError } from '../lib/api'
+import { useModal } from '../lib/useModal'
+import { toast } from '../lib/toast'
 import './AddFundsModal.css'
 
 type MakeOfferModalProps = {
@@ -18,6 +20,7 @@ function MakeOfferModal({
   onClose,
   onSubmit,
 }: MakeOfferModalProps) {
+  const containerRef = useModal(onClose)
   const [amount, setAmount] = useState(suggestedAmount ? String(suggestedAmount) : '')
   const [message, setMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -36,6 +39,7 @@ function MakeOfferModal({
     setIsSubmitting(true)
     try {
       await onSubmit(parsed, currency, message.trim())
+      toast.success('Offer sent.')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not send the offer. Please try again.')
       setIsSubmitting(false)
@@ -47,7 +51,10 @@ function MakeOfferModal({
       <div
         className="modal-card"
         role="dialog"
+        aria-modal="true"
         aria-label="Make an offer"
+        ref={containerRef}
+        tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="modal-header">

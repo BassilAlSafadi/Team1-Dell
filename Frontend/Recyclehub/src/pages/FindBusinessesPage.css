@@ -31,13 +31,13 @@
 }
 
 .vendor-status-error {
-  color: #b3261e;
+  color: var(--danger);
 }
 
 .vendor-contact-error {
   margin-top: 8px;
   font-size: 13px;
-  color: #b3261e;
+  color: var(--danger);
 }
 
 .vendor-grid {

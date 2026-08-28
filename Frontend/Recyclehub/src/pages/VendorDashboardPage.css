@@ -38,11 +38,7 @@
   max-width: 620px;
 }
 
-.table-state {
-  padding: 24px 0;
-  color: var(--text);
-  font-size: 15px;
-}
+/* .table-state base lives in src/index.css. */
 
 .welcome-actions {
   display: flex;
@@ -236,7 +232,7 @@
 .profile-edit-error {
   margin-top: 12px;
   font-size: 13px;
-  color: #b3261e;
+  color: var(--danger);
 }
 
 .profile-edit-actions {

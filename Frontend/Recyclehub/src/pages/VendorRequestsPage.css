@@ -1,8 +1,4 @@
-.table-state {
-  padding: 24px 0;
-  color: var(--text);
-  font-size: 15px;
-}
+/* .table-state base lives in src/index.css. */
 
 .request-grid {
   display: grid;

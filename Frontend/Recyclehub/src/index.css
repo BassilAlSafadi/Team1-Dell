@@ -4,10 +4,20 @@
   --bg: #ffffff;
   --border: #dfe7e1;
 
-  --green: #1fa14a;
+  /* #18873e is the lightest green that still clears 4.5:1 for white text — the previous
+     #1fa14a measured 3.36:1 and failed WCAG AA on every primary button, sent message
+     bubble, and avatar that sets white text on this token. */
+  --green: #18873e;
   --green-dark: #16803a;
   --green-light: #eaf7ee;
   --surface: #f3faf5;
+
+  --info: #2159a3;
+  --info-light: #eaf1fb;
+  --warn: #96660c;
+  --warn-light: #fdf3e2;
+  --danger: #b3261e;
+  --danger-light: #fbeceb;
 
   --shadow:
     rgba(15, 26, 19, 0.08) 0 10px 25px -5px, rgba(15, 26, 19, 0.05) 0 4px 6px -2px;
@@ -184,4 +194,267 @@ button {
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
+}
+
+/* Brand mark — shared by the authenticated Navbar and the marketing header on
+   LandingPage (LoginPage/RegisterPage scope their own copy under a page-specific
+   class, so they layer on top of this rather than collide with it). */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--green);
+  color: #fff;
+}
+
+.logo svg {
+  width: 24px;
+  height: 24px;
+}
+
+.brand-name {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------------------------------------------------------------------
+   Status badges — shared across My Waste, Transactions, and Vendor
+   Transactions. The base rule is a deliberate neutral fallback: a status
+   string the color map below doesn't recognize still renders as a
+   readable grey pill instead of an unstyled blank one. Buckets are by
+   meaning, not by which page uses them, since the same badge component
+   renders listing statuses (ACTIVE/RESERVED/SOLD/…), deal statuses
+   (AGREED/HANDOVER_PENDING/…) and wallet transaction types/statuses
+   through one shared class-name pattern.
+------------------------------------------------------------------------ */
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--border);
+  color: var(--text-h);
+}
+
+.status-sold,
+.status-completed,
+.status-top-up,
+.status-refund,
+.status-accepted {
+  background: var(--green-light);
+  color: var(--green-dark);
+}
+
+.status-active,
+.status-identified,
+.status-agreed,
+.status-payment {
+  background: var(--info-light);
+  color: var(--info);
+}
+
+.status-pending,
+.status-reserved,
+.status-handover-pending,
+.status-withdrawal {
+  background: var(--warn-light);
+  color: var(--warn);
+}
+
+.status-cancelled,
+.status-expired,
+.status-disputed,
+.status-rejected,
+.status-withdrawn,
+.status-failed {
+  background: var(--danger-light);
+  color: var(--danger);
+}
+
+/* ---------------------------------------------------------------------
+   Table / list state text — loading, empty, and error all rendered
+   through one shared class so pages read consistently. `-error` gets its
+   own color and pairs with a "Try again" retry button; `-centered` is for
+   panels where the state is the only content on the page.
+------------------------------------------------------------------------ */
+
+.table-state {
+  padding: 24px 0;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.table-state-centered {
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.table-state-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  color: var(--danger);
+}
+
+.table-state-centered.table-state-error {
+  align-items: center;
+}
+
+.table-state-retry {
+  padding: 8px 20px;
+  font-size: 14px;
+}
+
+/* ---------------------------------------------------------------------
+   Loading skeletons — reserve the real content's shape so nothing shifts
+   into place once data arrives. One shimmer animation, several block
+   sizes composed per page.
+------------------------------------------------------------------------ */
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton {
+  display: inline-block;
+  border-radius: 8px;
+  background: linear-gradient(100deg, var(--surface) 30%, var(--green-light) 50%, var(--surface) 70%);
+  background-size: 240% 100%;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+.skeleton-text {
+  height: 14px;
+  border-radius: 4px;
+}
+
+.skeleton-line + .skeleton-line {
+  margin-top: 10px;
+}
+
+/* ---------------------------------------------------------------------
+   Toasts — one fixed region, mounted once at the app root, so every
+   success/error confirmation looks and behaves the same way.
+------------------------------------------------------------------------ */
+
+.toast-region {
+  position: fixed;
+  z-index: 200;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: min(360px, calc(100vw - 32px));
+}
+
+@media (max-width: 640px) {
+  .toast-region {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    max-width: none;
+  }
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  font-size: 14.5px;
+  color: var(--text-h);
+  animation: toast-in 0.2s ease-out;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toast-icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+}
+
+.toast-success .toast-icon {
+  color: var(--green-dark);
+}
+
+.toast-error .toast-icon {
+  color: var(--danger);
+}
+
+.toast-message {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.toast-dismiss {
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  padding: 2px;
+  color: var(--text);
+  cursor: pointer;
+  line-height: 0;
+}
+
+.toast-dismiss:hover {
+  color: var(--text-h);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

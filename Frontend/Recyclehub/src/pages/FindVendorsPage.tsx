@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import ChatbotWidget from '../components/ChatbotWidget'
+import RetryState from '../components/RetryState'
 import { api, ApiError } from '../lib/api'
 import './FindVendorsPage.css'
 
@@ -170,9 +171,23 @@ function FindVendorsPage() {
         </form>
 
         {isLoading ? (
-          <p className="vendor-status">Loading vendors…</p>
+          <div className="vendor-grid" aria-hidden="true">
+            {[0, 1, 2].map((card) => (
+              <article className="vendor-card vendor-card-skeleton" key={card}>
+                <div className="vendor-card-top">
+                  <span className="skeleton skeleton-text" style={{ width: '60%', height: 18 }} />
+                  <span className="skeleton skeleton-text" style={{ width: 36 }} />
+                </div>
+                <span className="skeleton skeleton-text" style={{ width: '80%', marginTop: 12 }} />
+                <span
+                  className="skeleton"
+                  style={{ width: 96, height: 32, borderRadius: 999, marginTop: 20 }}
+                />
+              </article>
+            ))}
+          </div>
         ) : error ? (
-          <p className="vendor-status vendor-status-error">{error}</p>
+          <RetryState message={error} onRetry={() => search(query.trim(), city.trim(), category)} />
         ) : vendors.length === 0 ? (
           <p className="vendor-status">No vendors found.</p>
         ) : (

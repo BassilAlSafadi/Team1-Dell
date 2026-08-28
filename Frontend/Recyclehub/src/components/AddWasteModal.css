@@ -97,7 +97,7 @@
 .modal-error {
   margin-top: 16px;
   font-size: 14px;
-  color: #b3261e;
+  color: var(--danger);
 }
 
 .modal-actions {

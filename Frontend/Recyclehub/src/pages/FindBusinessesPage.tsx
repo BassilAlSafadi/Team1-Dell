@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import ChatbotWidget from '../components/ChatbotWidget'
+import RetryState from '../components/RetryState'
 import { api, ApiError } from '../lib/api'
 import './FindBusinessesPage.css'
 
@@ -117,7 +118,7 @@ function FindBusinessesPage() {
         {isLoading ? (
           <p className="vendor-status">Loading businesses…</p>
         ) : error ? (
-          <p className="vendor-status vendor-status-error">{error}</p>
+          <RetryState message={error} onRetry={() => search(query.trim(), city.trim())} />
         ) : businesses.length === 0 ? (
           <p className="vendor-status">No businesses found.</p>
         ) : (

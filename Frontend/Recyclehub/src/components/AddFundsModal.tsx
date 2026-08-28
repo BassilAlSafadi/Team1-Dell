@@ -1,5 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../lib/api'
+import { useModal } from '../lib/useModal'
+import { toast } from '../lib/toast'
 import './AddFundsModal.css'
 
 type WalletResponse = {
@@ -37,6 +39,7 @@ function formatMoney(amount: number, currency: string): string {
 }
 
 function AddFundsModal({ onClose, onFunded = () => {} }: AddFundsModalProps) {
+  const containerRef = useModal(onClose)
   const [amount, setAmount] = useState('')
   const [currency, setCurrency] = useState(DEFAULT_CURRENCY)
   const [balance, setBalance] = useState<number | null>(null)
@@ -83,6 +86,7 @@ function AddFundsModal({ onClose, onFunded = () => {} }: AddFundsModalProps) {
         currency,
       })
       setNewBalance(tx.balanceAfter)
+      toast.success(`Added ${formatMoney(parsed, tx.currency)}.`)
       onFunded(tx.balanceAfter, tx.currency)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not add funds. Please try again.')
@@ -96,7 +100,10 @@ function AddFundsModal({ onClose, onFunded = () => {} }: AddFundsModalProps) {
       <div
         className="modal-card"
         role="dialog"
+        aria-modal="true"
         aria-label="Add funds to your wallet"
+        ref={containerRef}
+        tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="modal-header">

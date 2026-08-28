@@ -10,7 +10,7 @@
 }
 
 .mywaste-status-error {
-  color: #b3261e;
+  color: var(--danger);
 }
 
 .mywaste-table {
@@ -41,26 +41,49 @@
   border-bottom: none;
 }
 
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 12px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 600;
+/* Below 640px, the table stops scrolling sideways and stacks into cards — one row per
+   item, each cell labeled by the data-label the markup sets, matching its <th>. */
+@media (max-width: 640px) {
+  .mywaste-table {
+    min-width: 0;
+  }
+
+  .mywaste-table thead {
+    display: none;
+  }
+
+  .mywaste-table,
+  .mywaste-table tbody,
+  .mywaste-table tr,
+  .mywaste-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .mywaste-table tr {
+    padding: 14px 20px;
+  }
+
+  .mywaste-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 6px 0;
+    border-bottom: none;
+    text-align: right;
+  }
+
+  .mywaste-table td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text);
+    text-align: left;
+  }
 }
 
-.status-sold {
-  background: var(--green-light);
-  color: var(--green-dark);
-}
-
-.status-identified {
-  background: #eaf1fb;
-  color: #2159a3;
-}
-
-.status-pending {
-  background: #fdf3e2;
-  color: #96660c;
-}
+/* .status-badge and its color variants are shared across pages — see src/index.css. */

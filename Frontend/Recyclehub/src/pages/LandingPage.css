@@ -5,9 +5,13 @@
   background: var(--bg);
 }
 
-/* Navbar */
+/* Marketing header — deliberately namespaced (marketing-*) so it never collides
+   with the authenticated app's Navbar.css, which defines .navbar/.nav-links with
+   different rules (including position: relative, load-bearing for its dropdowns).
+   .brand/.logo/.brand-name are the one part actually shared identically with
+   Navbar.css, so those live in index.css instead of being redefined here. */
 
-.navbar {
+.marketing-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -23,35 +27,7 @@
   }
 }
 
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.logo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: var(--green);
-  color: #fff;
-
-  svg {
-    width: 24px;
-    height: 24px;
-  }
-}
-
-.brand-name {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text-h);
-}
-
-.nav-links {
+.marketing-nav-links {
   display: flex;
   align-items: center;
   gap: 36px;
@@ -72,22 +48,28 @@
   }
 }
 
-.nav-actions {
+.marketing-nav-actions {
   display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-.get-started-btn {
+.marketing-btn {
   display: inline-flex;
   align-items: center;
   border: none;
   cursor: pointer;
   padding: 12px 28px;
-  background: var(--green);
-  color: #fff;
+  border-radius: 999px;
   font-size: 16px;
   font-weight: 600;
   text-decoration: none;
-  transition: background 0.2s, box-shadow 0.2s;
+  transition: background 0.2s, box-shadow 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.marketing-btn-solid {
+  background: var(--green);
+  color: #fff;
 
   &:hover {
     background: var(--green-dark);
@@ -96,15 +78,22 @@
   &:focus-visible {
     outline: 2px solid var(--green-dark);
     outline-offset: 2px;
-    z-index: 1;
   }
+}
 
-  &:first-child {
-    border-radius: 999px 0 0 999px;
+.marketing-btn-ghost {
+  background: transparent;
+  color: var(--text-h);
+  border: 1px solid var(--border);
+  padding: 11px 27px;
+
+  &:hover {
+    border-color: var(--green);
+    color: var(--green-dark);
   }
-  &:last-child {
-    border-radius: 0 999px 999px 0;
-    border-left: 1px solid rgba(255, 255, 255, 0.35);
+  &:focus-visible {
+    outline: 2px solid var(--green-dark);
+    outline-offset: 2px;
   }
 }
 

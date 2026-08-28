@@ -1,5 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../lib/api'
+import { useModal } from '../lib/useModal'
+import { toast } from '../lib/toast'
 import './AddWasteModal.css'
 
 type CategoryResponse = {
@@ -15,6 +17,7 @@ type AddWasteModalProps = {
 }
 
 function AddWasteModal({ onClose, onCreated = () => {} }: AddWasteModalProps) {
+  const containerRef = useModal(onClose)
   const [submitted, setSubmitted] = useState(false)
   const [categories, setCategories] = useState<CategoryResponse[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -62,6 +65,7 @@ function AddWasteModal({ onClose, onCreated = () => {} }: AddWasteModalProps) {
         unit: 'KG',
       })
       setSubmitted(true)
+      toast.success('Waste item logged.')
       onCreated()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to log waste item. Please try again.')
@@ -75,7 +79,10 @@ function AddWasteModal({ onClose, onCreated = () => {} }: AddWasteModalProps) {
       <div
         className="modal-card"
         role="dialog"
+        aria-modal="true"
         aria-label="Add waste manually"
+        ref={containerRef}
+        tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="modal-header">

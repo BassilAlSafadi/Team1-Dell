@@ -45,7 +45,7 @@ const footerColumns = [
 function LandingPage() {
   return (
     <div className="page">
-      <header className="navbar">
+      <header className="marketing-header">
         <div className="brand">
           <span className="logo" aria-hidden="true">
             <svg
@@ -68,24 +68,22 @@ function LandingPage() {
           <span className="brand-name">RecycleHub</span>
         </div>
 
-        <nav className="nav-links">
+        <nav className="marketing-nav-links">
           <a href="#home">Home</a>
           <a href="#how-it-works">How it works</a>
-          <a href="#locations">Locations</a>
-          <a href="#about">About</a>
         </nav>
 
-        <div className="nav-actions">
-          <Link to="/register" className="get-started-btn">
-            Register
-          </Link>
-          <Link to="/login" className="get-started-btn">
+        <div className="marketing-nav-actions">
+          <Link to="/login" className="marketing-btn marketing-btn-ghost">
             Log In
+          </Link>
+          <Link to="/register" className="marketing-btn marketing-btn-solid">
+            Register
           </Link>
         </div>
       </header>
 
-      <main>
+      <main id="home">
         <section
           className="hero"
           style={{ backgroundImage: `var(--hero-scrim), url(${heroImage})` }}
@@ -198,8 +196,6 @@ function LandingPage() {
         </div>
       </section>
 
-    
-
       <footer className="site-footer">
         <div className="footer-inner">
           <div className="footer-brand">
@@ -232,7 +228,7 @@ function LandingPage() {
               <div className="footer-col" key={col.heading}>
                 <h4>{col.heading}</h4>
                 {col.links.map((link) => (
-                  <a href="#" key={link}>
+                  <a href={link === 'How it works' ? '#how-it-works' : '#'} key={link}>
                     {link}
                   </a>
                 ))}

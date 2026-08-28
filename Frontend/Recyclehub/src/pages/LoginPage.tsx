@@ -160,10 +160,6 @@ function LoginPage() {
                     required
                   />
 
-                  <a href="#forgot-password" className="forgot-password">
-                    forgot password?
-                  </a>
-
                   {error && (
                     <p className="login-error" role="alert">
                       {error}
