@@ -248,8 +248,11 @@ public class WalletService : IWalletService
     /// </summary>
     public async Task SettleDealDirectAsync(Guid dealId, CancellationToken ct)
     {
-        var deal = await _db.Deals.FirstOrDefaultAsync(d => d.DealId == dealId, ct)
+        var deal = await _db.Deals.AsNoTracking().FirstOrDefaultAsync(d => d.DealId == dealId, ct)
             ?? throw new TransactionDomainException(HttpStatusCode.NotFound, "Deal not found.");
+
+        var amount = deal.AgreedAmount;
+        var currency = deal.Currency;
 
         var alreadySettled = await _db.WalletTransactions.AnyAsync(
             wt => wt.DealId == dealId && wt.Type == WalletTransactionType.Payment.ToDbValue(), ct);
@@ -260,33 +263,37 @@ public class WalletService : IWalletService
 
         var buyerUserId = await _accounts.ResolveOwnerAsync(deal.BuyerId, ct);
         var sellerUserId = await _accounts.ResolveOwnerAsync(deal.SellerId, ct);
+        var now = DateTimeOffset.UtcNow;
 
-        // Join the caller's transaction (AcceptAsync opens one) so the deal, the offer status
-        // and both money movements commit or roll back together.
+        // Join the caller's transaction (AcceptAsync opens one) so the offer/deal rows and both
+        // money movements commit or roll back together.
         var ambient = _db.Database.CurrentTransaction;
         var dbTransaction = ambient is null ? await _db.Database.BeginTransactionAsync(ct) : null;
         try
         {
-            var now = DateTimeOffset.UtcNow;
+            // The two legs are saved separately — Deal.Payment is a 1:1 navigation, so EF would
+            // steal the deal_id from one row if both PAYMENT and PAYOUT for the same deal sat in
+            // the change tracker at once. ChangeTracker.Clear() between legs keeps them apart;
+            // it doesn't touch the open transaction.
 
             var buyerWallet = await _db.Wallets.FirstOrDefaultAsync(w => w.UserId == buyerUserId, ct)
                 ?? throw new TransactionDomainException(
                     HttpStatusCode.BadRequest,
                     "The vendor has no wallet — they need to add funds before this offer can be accepted.");
             RequireActive(buyerWallet);
-            RequireSameCurrency(deal.Currency, buyerWallet.Currency);
-            if (buyerWallet.Balance < deal.AgreedAmount)
+            RequireSameCurrency(currency, buyerWallet.Currency);
+            if (buyerWallet.Balance < amount)
             {
                 throw new TransactionDomainException(
                     HttpStatusCode.BadRequest,
                     "The vendor no longer has enough balance to cover this offer.");
             }
-
-            buyerWallet.Balance -= deal.AgreedAmount;
+            buyerWallet.Balance -= amount;
             buyerWallet.UpdatedAt = now;
             _db.WalletTransactions.Add(NewTransaction(
-                buyerWallet, WalletTransactionType.Payment, -deal.AgreedAmount, deal.Currency, now,
-                dealId: deal.DealId));
+                buyerWallet, WalletTransactionType.Payment, -amount, currency, now, dealId: dealId));
+            await _db.SaveChangesAsync(ct);
+            _db.ChangeTracker.Clear();
 
             var sellerWallet = await _db.Wallets.FirstOrDefaultAsync(w => w.UserId == sellerUserId, ct);
             if (sellerWallet is null)
@@ -296,22 +303,20 @@ public class WalletService : IWalletService
                     WalletId = Guid.NewGuid(),
                     UserId = sellerUserId,
                     Balance = 0,
-                    Currency = deal.Currency.ToUpperInvariant(),
+                    Currency = currency.ToUpperInvariant(),
                     Status = WalletStatus.Active.ToDbValue(),
                     CreatedAt = now,
                     UpdatedAt = now
                 };
                 _db.Wallets.Add(sellerWallet);
             }
-            RequireSameCurrency(deal.Currency, sellerWallet.Currency);
-
-            sellerWallet.Balance += deal.AgreedAmount;
+            RequireSameCurrency(currency, sellerWallet.Currency);
+            sellerWallet.Balance += amount;
             sellerWallet.UpdatedAt = now;
             _db.WalletTransactions.Add(NewTransaction(
-                sellerWallet, WalletTransactionType.Payout, deal.AgreedAmount, deal.Currency, now,
-                dealId: deal.DealId));
-
+                sellerWallet, WalletTransactionType.Payout, amount, currency, now, dealId: dealId));
             await _db.SaveChangesAsync(ct);
+
             if (dbTransaction is not null)
             {
                 await dbTransaction.CommitAsync(ct);
