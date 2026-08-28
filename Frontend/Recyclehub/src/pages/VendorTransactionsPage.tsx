@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import ChatbotWidget from '../components/ChatbotWidget'
 import AddFundsModal from '../components/AddFundsModal'
@@ -148,6 +149,13 @@ function mergeRows(deals: DealResponse[], walletTx: WalletTransactionResponse[])
 }
 
 function VendorTransactionsPage() {
+  // Set when arriving from a "deal status changed" notification click — highlights and
+  // scrolls to that row once it's loaded, so clicking the notification actually shows
+  // you the deal it was about instead of just landing on the page.
+  const location = useLocation()
+  const highlightDealId = (location.state as { highlightDealId?: string } | null)?.highlightDealId
+  const highlightRowId = highlightDealId ? `deal-${highlightDealId}` : null
+
   const [loading, setLoading] = useState(true)
   const [hasProfile, setHasProfile] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -198,6 +206,11 @@ function VendorTransactionsPage() {
   useEffect(() => {
     load()
   }, [load])
+
+  useEffect(() => {
+    if (!highlightRowId || rows.length === 0) return
+    document.getElementById(highlightRowId)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [highlightRowId, rows])
 
   return (
     <div className="page">
@@ -254,7 +267,7 @@ function VendorTransactionsPage() {
               </thead>
               <tbody>
                 {rows.map((tx) => (
-                  <tr key={tx.id}>
+                  <tr key={tx.id} id={tx.id} className={tx.id === highlightRowId ? 'row-highlight' : undefined}>
                     <td data-label="Date">{tx.date}</td>
                     <td data-label="Business">{tx.business}</td>
                     <td data-label="Material">{tx.material}</td>
