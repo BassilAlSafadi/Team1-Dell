@@ -159,6 +159,7 @@ function BusinessOffersPage() {
 
   const respond = async (offerId: string, action: 'accept' | 'reject') => {
     setActions((prev) => ({ ...prev, [offerId]: action === 'accept' ? 'accepting' : 'rejecting' }))
+    const row = rows.find((r) => r.offer.offerId === offerId)
     try {
       await api.post(`/api/offers/${offerId}/${action}`)
       await load()
@@ -167,7 +168,14 @@ function BusinessOffersPage() {
         delete next[offerId]
         return next
       })
-      toast.success(action === 'accept' ? 'Offer accepted.' : 'Offer rejected.')
+      if (action === 'accept' && row) {
+        // Accepting settles the deal on the spot — the amount is already in the wallet.
+        toast.success(
+          `Offer accepted — ${formatMoney(row.offer.offeredAmount, row.offer.currency)} paid to your wallet.`,
+        )
+      } else {
+        toast.success(action === 'accept' ? 'Offer accepted.' : 'Offer rejected.')
+      }
     } catch (err) {
       setActions((prev) => ({ ...prev, [offerId]: 'error' }))
       setError(err instanceof ApiError ? err.message : 'Could not update the offer.')

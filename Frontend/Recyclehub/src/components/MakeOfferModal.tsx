@@ -1,8 +1,17 @@
-import { useState, type FormEvent } from 'react'
-import { ApiError } from '../lib/api'
+import { useEffect, useState, type FormEvent } from 'react'
+import { api, ApiError } from '../lib/api'
 import { useModal } from '../lib/useModal'
 import { toast } from '../lib/toast'
 import './AddFundsModal.css'
+
+type WalletResponse = { balance: number; currency: string }
+
+function formatMoney(amount: number, currency: string): string {
+  return `${amount.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} ${currency}`
+}
 
 type MakeOfferModalProps = {
   listingTitle: string
@@ -25,20 +34,50 @@ function MakeOfferModal({
   const [message, setMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [balance, setBalance] = useState<number | null>(null)
+
+  // The vendor pays their offer amount the moment the business accepts it, so an offer above
+  // the current wallet balance can never be honoured — block it here.
+  useEffect(() => {
+    let cancelled = false
+    api
+      .get<WalletResponse>('/api/wallets/me')
+      .then((wallet) => {
+        if (!cancelled) setBalance(wallet.balance)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        // 404 = no wallet opened yet -> treat as a zero balance.
+        setBalance(err instanceof ApiError && err.status === 404 ? 0 : null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const parsedAmount = Number(amount)
+  const overBalance =
+    balance !== null && Number.isFinite(parsedAmount) && parsedAmount > 0 && parsedAmount > balance
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setError(null)
 
-    const parsed = Number(amount)
-    if (!Number.isFinite(parsed) || parsed <= 0) {
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
       setError('Enter an amount greater than zero.')
+      return
+    }
+
+    if (overBalance) {
+      setError(
+        `That's more than your wallet balance (${formatMoney(balance ?? 0, currency)}). Add funds first.`,
+      )
       return
     }
 
     setIsSubmitting(true)
     try {
-      await onSubmit(parsed, currency, message.trim())
+      await onSubmit(parsedAmount, currency, message.trim())
       toast.success('Offer sent.')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not send the offer. Please try again.')
@@ -72,6 +111,11 @@ function MakeOfferModal({
             <strong>{listingTitle}</strong>
           </p>
 
+          <p className="add-funds-balance">
+            <span>Your wallet balance</span>
+            <strong>{balance === null ? '…' : formatMoney(balance, currency)}</strong>
+          </p>
+
           <label htmlFor="offer-amount">
             Your offer{suggestedAmount ? ` (business expects ${suggestedAmount} ${currency})` : ''}
           </label>
@@ -83,6 +127,7 @@ function MakeOfferModal({
               inputMode="decimal"
               step="0.01"
               min="0.01"
+              max={balance ?? undefined}
               placeholder="0.00"
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
@@ -91,6 +136,11 @@ function MakeOfferModal({
             />
             <span className="add-funds-currency">{currency}</span>
           </div>
+          {overBalance && (
+            <p className="modal-error">
+              Over your balance — you can offer at most {formatMoney(balance ?? 0, currency)}.
+            </p>
+          )}
 
           <label htmlFor="offer-message">Message (optional)</label>
           <textarea
@@ -108,7 +158,7 @@ function MakeOfferModal({
             <button type="button" className="btn-secondary" onClick={onClose} disabled={isSubmitting}>
               Cancel
             </button>
-            <button type="submit" className="btn-primary" disabled={isSubmitting}>
+            <button type="submit" className="btn-primary" disabled={isSubmitting || overBalance}>
               {isSubmitting ? 'Sending…' : 'Send offer'}
             </button>
           </div>

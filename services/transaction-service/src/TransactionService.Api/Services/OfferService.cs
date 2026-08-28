@@ -18,12 +18,18 @@ public class OfferService : IOfferService
     private readonly TransactionDbContext _db;
     private readonly IRedisCache _cache;
     private readonly IMarketplaceAccountResolver _accounts;
+    private readonly IWalletService _wallets;
 
-    public OfferService(TransactionDbContext db, IRedisCache cache, IMarketplaceAccountResolver accounts)
+    public OfferService(
+        TransactionDbContext db,
+        IRedisCache cache,
+        IMarketplaceAccountResolver accounts,
+        IWalletService wallets)
     {
         _db = db;
         _cache = cache;
         _accounts = accounts;
+        _wallets = wallets;
     }
 
     public async Task<OfferResponse> CreateAsync(
@@ -145,6 +151,8 @@ public class OfferService : IOfferService
         offer.Status = OfferStatus.Accepted.ToDbValue();
         offer.RespondedAt = now;
 
+        // Acceptance settles the deal immediately: the money moves buyer -> seller now, so the
+        // deal is born COMPLETED rather than sitting in AGREED awaiting a separate payment step.
         var deal = new Deal
         {
             DealId = Guid.NewGuid(),
@@ -154,8 +162,9 @@ public class OfferService : IOfferService
             SellerId = offer.SellerId,
             AgreedAmount = offer.OfferedAmount,
             Currency = offer.Currency,
-            Status = DealStatus.Agreed.ToDbValue(),
-            CreatedAt = now
+            Status = DealStatus.Completed.ToDbValue(),
+            CreatedAt = now,
+            CompletedAt = now
         };
         _db.Deals.Add(deal);
 
@@ -164,13 +173,20 @@ public class OfferService : IOfferService
             HistoryId = Guid.NewGuid(),
             DealId = deal.DealId,
             PreviousStatus = null,
-            NewStatus = DealStatus.Agreed.ToDbValue(),
+            NewStatus = DealStatus.Completed.ToDbValue(),
             ChangedBy = actorUserId,
             ChangedAt = now,
             Reason = "Offer accepted"
         });
 
+        // One transaction for the offer/deal rows and both wallet movements: if the buyer can no
+        // longer cover the amount, SettleDealDirectAsync throws and nothing commits — the offer
+        // stays PENDING and the seller sees why.
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
         await _db.SaveChangesAsync(ct);
+        await _wallets.SettleDealDirectAsync(deal.DealId, ct);
+        await tx.CommitAsync(ct);
+
         await _cache.DeleteAsync(OfferCacheKey(offerId));
 
         return new DealResponse(

@@ -13,6 +13,13 @@ public interface IWalletService
     /// <summary>Moves the agreed amount from the buyer's wallet into escrow for this deal.</summary>
     Task<WalletTransactionResponse> PayForDealAsync(Guid userId, Guid dealId, CancellationToken ct);
 
+    /// <summary>
+    /// Settles a deal by moving the agreed amount straight from the buyer to the seller, in one
+    /// transaction. Called when an offer is accepted. Idempotent; throws 400 if the buyer can no
+    /// longer cover it.
+    /// </summary>
+    Task SettleDealDirectAsync(Guid dealId, CancellationToken ct);
+
     /// <summary>Credits held escrow to the seller. No-op if the deal was never paid.</summary>
     Task ReleaseEscrowAsync(Guid dealId, CancellationToken ct);
 

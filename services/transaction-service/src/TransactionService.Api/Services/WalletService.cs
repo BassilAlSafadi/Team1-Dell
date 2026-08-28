@@ -240,6 +240,96 @@ public class WalletService : IWalletService
         await SettleEscrowAsync(dealId, WalletTransactionType.Refund, ct);
 
     /// <summary>
+    /// Settles a deal in one step: the agreed amount moves straight from the buyer's wallet to
+    /// the seller's, both ledger rows written in the same database transaction. Used when an
+    /// offer is accepted — in this marketplace acceptance IS the settlement, there is no escrow
+    /// hold or separate "pay" step. Idempotent: a second call for an already-settled deal is a
+    /// no-op. Throws a 400 if the buyer no longer has the balance to cover it.
+    /// </summary>
+    public async Task SettleDealDirectAsync(Guid dealId, CancellationToken ct)
+    {
+        var deal = await _db.Deals.FirstOrDefaultAsync(d => d.DealId == dealId, ct)
+            ?? throw new TransactionDomainException(HttpStatusCode.NotFound, "Deal not found.");
+
+        var alreadySettled = await _db.WalletTransactions.AnyAsync(
+            wt => wt.DealId == dealId && wt.Type == WalletTransactionType.Payment.ToDbValue(), ct);
+        if (alreadySettled)
+        {
+            return;
+        }
+
+        var buyerUserId = await _accounts.ResolveOwnerAsync(deal.BuyerId, ct);
+        var sellerUserId = await _accounts.ResolveOwnerAsync(deal.SellerId, ct);
+
+        // Join the caller's transaction (AcceptAsync opens one) so the deal, the offer status
+        // and both money movements commit or roll back together.
+        var ambient = _db.Database.CurrentTransaction;
+        var dbTransaction = ambient is null ? await _db.Database.BeginTransactionAsync(ct) : null;
+        try
+        {
+            var now = DateTimeOffset.UtcNow;
+
+            var buyerWallet = await _db.Wallets.FirstOrDefaultAsync(w => w.UserId == buyerUserId, ct)
+                ?? throw new TransactionDomainException(
+                    HttpStatusCode.BadRequest,
+                    "The vendor has no wallet — they need to add funds before this offer can be accepted.");
+            RequireActive(buyerWallet);
+            RequireSameCurrency(deal.Currency, buyerWallet.Currency);
+            if (buyerWallet.Balance < deal.AgreedAmount)
+            {
+                throw new TransactionDomainException(
+                    HttpStatusCode.BadRequest,
+                    "The vendor no longer has enough balance to cover this offer.");
+            }
+
+            buyerWallet.Balance -= deal.AgreedAmount;
+            buyerWallet.UpdatedAt = now;
+            _db.WalletTransactions.Add(NewTransaction(
+                buyerWallet, WalletTransactionType.Payment, -deal.AgreedAmount, deal.Currency, now,
+                dealId: deal.DealId));
+
+            var sellerWallet = await _db.Wallets.FirstOrDefaultAsync(w => w.UserId == sellerUserId, ct);
+            if (sellerWallet is null)
+            {
+                sellerWallet = new Wallet
+                {
+                    WalletId = Guid.NewGuid(),
+                    UserId = sellerUserId,
+                    Balance = 0,
+                    Currency = deal.Currency.ToUpperInvariant(),
+                    Status = WalletStatus.Active.ToDbValue(),
+                    CreatedAt = now,
+                    UpdatedAt = now
+                };
+                _db.Wallets.Add(sellerWallet);
+            }
+            RequireSameCurrency(deal.Currency, sellerWallet.Currency);
+
+            sellerWallet.Balance += deal.AgreedAmount;
+            sellerWallet.UpdatedAt = now;
+            _db.WalletTransactions.Add(NewTransaction(
+                sellerWallet, WalletTransactionType.Payout, deal.AgreedAmount, deal.Currency, now,
+                dealId: deal.DealId));
+
+            await _db.SaveChangesAsync(ct);
+            if (dbTransaction is not null)
+            {
+                await dbTransaction.CommitAsync(ct);
+            }
+        }
+        finally
+        {
+            if (dbTransaction is not null)
+            {
+                await dbTransaction.DisposeAsync();
+            }
+        }
+
+        await _cache.DeleteAsync(WalletCacheKey(buyerUserId));
+        await _cache.DeleteAsync(WalletCacheKey(sellerUserId));
+    }
+
+    /// <summary>
     /// Credits held escrow to its destination: the seller on completion (PAYOUT), or back to the
     /// buyer on cancellation (REFUND). A no-op when the deal was never paid.
     /// </summary>
