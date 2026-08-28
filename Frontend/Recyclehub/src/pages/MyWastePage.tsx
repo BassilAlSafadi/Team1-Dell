@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Navbar from '../components/Navbar'
 import ChatbotWidget from '../components/ChatbotWidget'
 import AddWasteModal from '../components/AddWasteModal'
+import RetryState from '../components/RetryState'
 import { api, ApiError } from '../lib/api'
 import './MyWastePage.css'
 
@@ -76,9 +77,30 @@ function MyWastePage() {
 
         <div className="panel mywaste-table-panel">
           {isLoading ? (
-            <p className="mywaste-status">Loading your waste items…</p>
+            <table className="mywaste-table" aria-hidden="true">
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Weight</th>
+                  <th>Date Logged</th>
+                  <th>Status</th>
+                  <th>Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[0, 1, 2, 3].map((row) => (
+                  <tr key={row}>
+                    {[88, 64, 96, 72, 56].map((width, col) => (
+                      <td key={col}>
+                        <span className="skeleton skeleton-text" style={{ width }} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           ) : error ? (
-            <p className="mywaste-status mywaste-status-error">{error}</p>
+            <RetryState message={error} onRetry={fetchListings} centered />
           ) : listings.length === 0 ? (
             <p className="mywaste-status">No waste items yet — log your first one.</p>
           ) : (
@@ -95,15 +117,15 @@ function MyWastePage() {
               <tbody>
                 {listings.map((item) => (
                   <tr key={item.listingId}>
-                    <td>{item.categoryName || item.title}</td>
-                    <td>{`${item.quantity} ${item.unit}`}</td>
-                    <td>{formatDate(item.createdAt)}</td>
-                    <td>
+                    <td data-label="Type">{item.categoryName || item.title}</td>
+                    <td data-label="Weight">{`${item.quantity} ${item.unit}`}</td>
+                    <td data-label="Date Logged">{formatDate(item.createdAt)}</td>
+                    <td data-label="Status">
                       <span className={`status-badge status-${item.status.toLowerCase()}`}>
                         {item.status}
                       </span>
                     </td>
-                    <td>{formatValue(item)}</td>
+                    <td data-label="Value">{formatValue(item)}</td>
                   </tr>
                 ))}
               </tbody>

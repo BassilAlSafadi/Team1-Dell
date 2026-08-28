@@ -3,6 +3,7 @@ import Navbar from '../components/Navbar'
 import ChatbotWidget from '../components/ChatbotWidget'
 import AddFundsModal from '../components/AddFundsModal'
 import DealsPanel from '../components/DealsPanel'
+import RetryState from '../components/RetryState'
 import { api, ApiError } from '../lib/api'
 import './VendorTransactionsPage.css'
 
@@ -142,7 +143,8 @@ function mergeRows(deals: DealResponse[], walletTx: WalletTransactionResponse[])
 
   return [...dealRows, ...walletRows]
     .sort((a, b) => b.sortTs - a.sortTs)
-    .map(({ sortTs: _sortTs, ...row }) => row)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructuring off sortTs
+    .map(({ sortTs, ...row }) => row)
 }
 
 function VendorTransactionsPage() {
@@ -230,15 +232,15 @@ function VendorTransactionsPage() {
 
         <div className="panel vendor-transactions-panel">
           {loading ? (
-            <p className="table-state">Loading transactions…</p>
+            <p className="table-state table-state-centered">Loading transactions…</p>
           ) : !hasProfile ? (
-            <p className="table-state">
+            <p className="table-state table-state-centered">
               Complete your vendor profile to see transactions.
             </p>
           ) : error ? (
-            <p className="table-state">{error}</p>
+            <RetryState message={error} onRetry={load} centered />
           ) : rows.length === 0 ? (
-            <p className="table-state">No transactions yet.</p>
+            <p className="table-state table-state-centered">No transactions yet.</p>
           ) : (
             <table className="vendor-transactions-table">
               <thead>
@@ -253,13 +255,16 @@ function VendorTransactionsPage() {
               <tbody>
                 {rows.map((tx) => (
                   <tr key={tx.id}>
-                    <td>{tx.date}</td>
-                    <td>{tx.business}</td>
-                    <td>{tx.material}</td>
-                    <td className={tx.amount.startsWith('-') ? 'amount-negative' : 'amount-positive'}>
+                    <td data-label="Date">{tx.date}</td>
+                    <td data-label="Business">{tx.business}</td>
+                    <td data-label="Material">{tx.material}</td>
+                    <td
+                      data-label="Amount"
+                      className={tx.amount.startsWith('-') ? 'amount-negative' : 'amount-positive'}
+                    >
                       {tx.amount}
                     </td>
-                    <td>
+                    <td data-label="Status">
                       <span className={`status-badge status-${tx.status.toLowerCase().replace(/\s+/g, '-')}`}>
                         {tx.status}
                       </span>

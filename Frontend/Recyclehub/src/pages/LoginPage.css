@@ -196,13 +196,6 @@
   }
 }
 
-.forgot-password {
-  align-self: flex-start;
-  margin-top: 4px;
-  font-size: 14px;
-  color: var(--text);
-}
-
 .login-error {
   margin-top: 12px;
   font-size: 14px;

@@ -362,7 +362,11 @@ function DashboardPage() {
               </span>
               <div>
                 <p className="stat-card-label">{stat.label}</p>
-                <p className="stat-card-value">{isLoadingDashboard ? '…' : stat.value}</p>
+                {isLoadingDashboard ? (
+                  <span className="skeleton stat-card-value-skeleton" aria-hidden="true" />
+                ) : (
+                  <p className="stat-card-value">{stat.value}</p>
+                )}
               </div>
             </div>
           ))}

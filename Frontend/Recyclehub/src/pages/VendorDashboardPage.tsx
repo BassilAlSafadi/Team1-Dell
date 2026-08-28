@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import ChatbotWidget from '../components/ChatbotWidget'
 import AddFundsModal from '../components/AddFundsModal'
+import RetryState from '../components/RetryState'
 import { api, ApiError } from '../lib/api'
 import { useAuth } from '../lib/auth'
+import { toast } from '../lib/toast'
 import './VendorDashboardPage.css'
 
 type WalletResponse = { balance: number; currency: string }
@@ -314,6 +316,7 @@ function VendorDashboardPage() {
           : prev,
       )
       setIsEditing(false)
+      toast.success('Profile updated.')
     } catch (err) {
       setEditError(err instanceof ApiError ? err.message : 'Failed to save changes.')
     } finally {
@@ -364,7 +367,7 @@ function VendorDashboardPage() {
         {loading ? (
           <p className="table-state">Loading your dashboard…</p>
         ) : error ? (
-          <p className="table-state">{error}</p>
+          <RetryState message={error} onRetry={loadDashboard} />
         ) : (
           <>
             <section className="stats-grid">

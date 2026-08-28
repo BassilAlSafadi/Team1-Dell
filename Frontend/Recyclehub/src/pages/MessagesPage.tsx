@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useLocation } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import ChatbotWidget from '../components/ChatbotWidget'
+import RetryState from '../components/RetryState'
 import { api, ApiError } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import './MessagesPage.css'
@@ -76,6 +77,9 @@ function MessagesPage() {
   const [isSending, setIsSending] = useState(false)
   const [listError, setListError] = useState<string | null>(null)
   const [threadError, setThreadError] = useState<string | null>(null)
+  // Bumped by the retry button below to re-run the effect as if it were mounting fresh
+  // (isInitial: true), without disturbing the interval/cancellation logic inside it.
+  const [listRetryKey, setListRetryKey] = useState(0)
 
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -122,7 +126,7 @@ function MessagesPage() {
       cancelled = true
       clearInterval(interval)
     }
-  }, [])
+  }, [listRetryKey])
 
   // Selected thread — polled while open so a reply shows up without a manual refresh.
   // No selectedId branch here: the thread panel itself is gated on selectedConversation
@@ -205,7 +209,11 @@ function MessagesPage() {
             {isLoadingList ? (
               <p className="messages-state">Loading conversations…</p>
             ) : listError ? (
-              <p className="messages-state">{listError}</p>
+              <RetryState
+                message={listError}
+                onRetry={() => setListRetryKey((k) => k + 1)}
+                centered
+              />
             ) : conversations.length === 0 ? (
               <p className="messages-state">
                 No conversations yet — reach out from Find Vendors or Find Requests.

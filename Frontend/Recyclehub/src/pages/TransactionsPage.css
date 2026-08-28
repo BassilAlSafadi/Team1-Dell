@@ -3,12 +3,8 @@
   overflow-x: auto;
 }
 
-.table-state {
-  padding: 40px 24px;
-  text-align: center;
-  color: var(--text);
-  font-size: 15px;
-}
+/* .table-state base lives in src/index.css; this page pairs it with the
+   .table-state-centered modifier for the 40px/centered look. */
 
 .transactions-table {
   width: 100%;
@@ -44,30 +40,53 @@
 }
 
 .amount-negative {
-  color: #a3312c;
+  color: var(--danger);
   font-weight: 700;
 }
 
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 12px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 600;
+/* Below 640px, the table stops scrolling sideways and stacks into cards — see the
+   matching rule in MyWastePage.css for the pattern this mirrors. */
+@media (max-width: 640px) {
+  .transactions-table {
+    min-width: 0;
+  }
+
+  .transactions-table thead {
+    display: none;
+  }
+
+  .transactions-table,
+  .transactions-table tbody,
+  .transactions-table tr,
+  .transactions-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .transactions-table tr {
+    padding: 14px 20px;
+  }
+
+  .transactions-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 6px 0;
+    border-bottom: none;
+    text-align: right;
+  }
+
+  .transactions-table td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text);
+    text-align: left;
+  }
 }
 
-.status-completed {
-  background: var(--green-light);
-  color: var(--green-dark);
-}
-
-.status-identified {
-  background: #eaf1fb;
-  color: #2159a3;
-}
-
-.status-pending {
-  background: #fdf3e2;
-  color: #96660c;
-}
+/* .status-badge and its color variants are shared across pages — see src/index.css. */

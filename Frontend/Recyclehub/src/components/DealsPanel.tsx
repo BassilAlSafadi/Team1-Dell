@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, ApiError } from '../lib/api'
+import { toast } from '../lib/toast'
 import './DealsPanel.css'
 
 export type DealResponse = {
@@ -90,11 +91,12 @@ function DealsPanel({ role, deals, walletTx, onChanged }: DealsPanelProps) {
   const isPaid = (dealId: string) =>
     walletTx.some((t) => t.dealId === dealId && t.type === 'PAYMENT')
 
-  const run = async (dealId: string, fn: () => Promise<unknown>) => {
+  const run = async (dealId: string, fn: () => Promise<unknown>, successMessage?: string) => {
     setBusy((p) => ({ ...p, [dealId]: true }))
     setError(null)
     try {
       await fn()
+      if (successMessage) toast.success(successMessage)
       await onChanged()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not update the deal.')
@@ -104,10 +106,24 @@ function DealsPanel({ role, deals, walletTx, onChanged }: DealsPanelProps) {
   }
 
   const pay = (d: DealResponse) =>
-    run(d.dealId, () => api.post('/api/wallets/me/pay', { dealId: d.dealId }))
+    run(
+      d.dealId,
+      () => api.post('/api/wallets/me/pay', { dealId: d.dealId }),
+      `Paid ${money(d.agreedAmount, d.currency)}.`,
+    )
+
+  const TRANSITION_MESSAGES: Record<string, string> = {
+    HANDOVER_PENDING: 'Marked as handed over.',
+    COMPLETED: 'Deal completed — payment released.',
+    CANCELLED: 'Deal cancelled.',
+  }
 
   const transition = (d: DealResponse, newStatus: string) =>
-    run(d.dealId, () => api.post(`/api/deals/${d.dealId}/transition`, { newStatus }))
+    run(
+      d.dealId,
+      () => api.post(`/api/deals/${d.dealId}/transition`, { newStatus }),
+      TRANSITION_MESSAGES[newStatus],
+    )
 
   if (active.length === 0) return null
 

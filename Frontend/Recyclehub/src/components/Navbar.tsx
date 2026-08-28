@@ -59,7 +59,7 @@ function Navbar({ variant: variantOverride }: { variant?: NavbarVariant }) {
   const { isAuthenticated, isVendor, user, logout } = useAuth()
   const variant: NavbarVariant = variantOverride ?? (isVendor ? 'vendor' : 'business')
 
-  const [openMenu, setOpenMenu] = useState<'notifications' | 'account' | null>(null)
+  const [openMenu, setOpenMenu] = useState<'notifications' | 'account' | 'mobile-nav' | null>(null)
   const [notifications, setNotifications] = useState<NotificationDto[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
 
@@ -67,7 +67,7 @@ function Navbar({ variant: variantOverride }: { variant?: NavbarVariant }) {
   const homeTo = variant === 'vendor' ? '/vendor-dashboard' : '/dashboard'
   const accountLabel = user?.email ?? ''
 
-  const toggleMenu = (menu: 'notifications' | 'account') => {
+  const toggleMenu = (menu: 'notifications' | 'account' | 'mobile-nav') => {
     setOpenMenu((current) => (current === menu ? null : menu))
   }
 
@@ -91,6 +91,16 @@ function Navbar({ variant: variantOverride }: { variant?: NavbarVariant }) {
     return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated])
+
+  // Escape closes whichever menu (notifications, account, or the mobile nav panel) is open.
+  useEffect(() => {
+    if (!openMenu) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpenMenu(null)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [openMenu])
 
   const handleNotificationClick = async (notification: NotificationDto) => {
     if (notification.isRead) return
@@ -149,79 +159,131 @@ function Navbar({ variant: variantOverride }: { variant?: NavbarVariant }) {
         )}
       </nav>
 
-      {isAuthenticated && (
-        <div className="nav-actions-group">
-          <div className="menu-anchor">
-            <button
-              type="button"
-              className="icon-btn"
-              aria-label="Notifications"
-              onClick={() => toggleMenu('notifications')}
-            >
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path
-                  d="M18 16v-5a6 6 0 1 0-12 0v5l-2 3h16l-2-3Z"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M9.5 20a2.5 2.5 0 0 0 5 0"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                />
-              </svg>
-              {unreadCount > 0 && <span className="notif-badge" aria-hidden="true" />}
-            </button>
+      <div className="nav-actions-group">
+        <button
+          type="button"
+          className="icon-btn nav-toggle"
+          aria-label={openMenu === 'mobile-nav' ? 'Close menu' : 'Open menu'}
+          aria-expanded={openMenu === 'mobile-nav'}
+          aria-controls="mobile-nav-panel"
+          onClick={() => toggleMenu('mobile-nav')}
+        >
+          {openMenu === 'mobile-nav' ? (
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M6 6l12 12M18 6L6 18"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M4 7h16M4 12h16M4 17h16"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
+          )}
+        </button>
 
-            {openMenu === 'notifications' && (
-              <div className="dropdown notif-dropdown">
-                <p className="dropdown-title">Notifications</p>
-                <ul>
-                  {notifications.length === 0 ? (
-                    <li>
-                      <p>No notifications yet.</p>
-                    </li>
-                  ) : (
-                    notifications.map((n) => (
-                      <li key={n.id}>
-                        <button
-                          type="button"
-                          className="notif-item"
-                          onClick={() => handleNotificationClick(n)}
-                        >
-                          <p>{n.isRead ? n.title : <strong>{n.title}</strong>}</p>
-                          <span>{timeAgo(n.createdAt)}</span>
-                        </button>
+        {isAuthenticated && (
+          <>
+            <div className="menu-anchor">
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label="Notifications"
+                onClick={() => toggleMenu('notifications')}
+              >
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M18 16v-5a6 6 0 1 0-12 0v5l-2 3h16l-2-3Z"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M9.5 20a2.5 2.5 0 0 0 5 0"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                {unreadCount > 0 && <span className="notif-badge" aria-hidden="true" />}
+              </button>
+
+              {openMenu === 'notifications' && (
+                <div className="dropdown notif-dropdown">
+                  <p className="dropdown-title">Notifications</p>
+                  <ul>
+                    {notifications.length === 0 ? (
+                      <li>
+                        <p>No notifications yet.</p>
                       </li>
-                    ))
-                  )}
-                </ul>
-              </div>
-            )}
-          </div>
+                    ) : (
+                      notifications.map((n) => (
+                        <li key={n.id}>
+                          <button
+                            type="button"
+                            className="notif-item"
+                            onClick={() => handleNotificationClick(n)}
+                          >
+                            <p>{n.isRead ? n.title : <strong>{n.title}</strong>}</p>
+                            <span>{timeAgo(n.createdAt)}</span>
+                          </button>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                </div>
+              )}
+            </div>
 
-          <div className="menu-anchor">
-            <button
-              type="button"
-              className="user-avatar"
-              aria-label="Account menu"
-              onClick={() => toggleMenu('account')}
-            >
-              {accountLabel ? accountLabel.charAt(0).toUpperCase() : 'U'}
-            </button>
+            <div className="menu-anchor">
+              <button
+                type="button"
+                className="user-avatar"
+                aria-label="Account menu"
+                onClick={() => toggleMenu('account')}
+              >
+                {accountLabel ? accountLabel.charAt(0).toUpperCase() : 'U'}
+              </button>
 
-            {openMenu === 'account' && (
-              <div className="dropdown account-dropdown">
-                <p className="dropdown-title">{accountLabel}</p>
-                <button type="button" className="dropdown-link" onClick={handleLogout}>
-                  Logout
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
+              {openMenu === 'account' && (
+                <div className="dropdown account-dropdown">
+                  <p className="dropdown-title">{accountLabel}</p>
+                  <button type="button" className="dropdown-link" onClick={handleLogout}>
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      {openMenu === 'mobile-nav' && (
+        <nav className="mobile-nav-panel" id="mobile-nav-panel" aria-label="Primary">
+          {navLinks.map((link) =>
+            link.to.includes('#') ? (
+              <Link to={link.to} key={link.label} onClick={() => setOpenMenu(null)}>
+                {link.label}
+              </Link>
+            ) : (
+              <NavLink
+                to={link.to}
+                key={link.label}
+                className={({ isActive }) => (isActive ? 'active' : undefined)}
+                onClick={() => setOpenMenu(null)}
+              >
+                {link.label}
+              </NavLink>
+            ),
+          )}
+        </nav>
       )}
 
       {openMenu && (

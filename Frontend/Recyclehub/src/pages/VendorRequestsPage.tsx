@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import ChatbotWidget from '../components/ChatbotWidget'
 import MakeOfferModal from '../components/MakeOfferModal'
+import RetryState from '../components/RetryState'
 import { api, ApiError } from '../lib/api'
 import './VendorRequestsPage.css'
 
@@ -111,48 +112,39 @@ function VendorRequestsPage() {
   const [messageStatus, setMessageStatus] = useState<Record<string, MessageStatus>>({})
   const [offerModalListing, setOfferModalListing] = useState<ListingResponse | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [listingsRes, hasVendorProfile] = await Promise.all([
+        api.get<ListingResponse[]>('/api/listings', { status: 'ACTIVE' }),
+        api.get<VendorProfileResponse>('/api/vendor-profiles/mine').then(
+          () => true,
+          (err) => {
+            if (err instanceof ApiError && err.status === 404) return false
+            throw err
+          },
+        ),
+      ])
 
-    async function load() {
-      setLoading(true)
-      setError(null)
-      try {
-        const [listingsRes, hasVendorProfile] = await Promise.all([
-          api.get<ListingResponse[]>('/api/listings', { status: 'ACTIVE' }),
-          api.get<VendorProfileResponse>('/api/vendor-profiles/mine').then(
-            () => true,
-            (err) => {
-              if (err instanceof ApiError && err.status === 404) return false
-              throw err
-            },
-          ),
-        ])
+      setListings(listingsRes)
+      setVendorProfileMissing(!hasVendorProfile)
 
-        if (cancelled) return
-
-        setListings(listingsRes)
-        setVendorProfileMissing(!hasVendorProfile)
-
-        const corporateIds = listingsRes
-          .map((listing) => listing.ownerCorporateId)
-          .filter((id): id is string => Boolean(id))
-        const info = await fetchBusinessInfo(corporateIds)
-        if (!cancelled) setBusinessInfo(info)
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof ApiError ? err.message : 'Failed to load requests.')
-        }
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    load()
-    return () => {
-      cancelled = true
+      const corporateIds = listingsRes
+        .map((listing) => listing.ownerCorporateId)
+        .filter((id): id is string => Boolean(id))
+      const info = await fetchBusinessInfo(corporateIds)
+      setBusinessInfo(info)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to load requests.')
+    } finally {
+      setLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
 
   async function submitOffer(listing: ListingResponse, amount: number, currency: string, message: string) {
     if (!listing.ownerCorporateId) return
@@ -207,7 +199,7 @@ function VendorRequestsPage() {
         {loading ? (
           <p className="table-state">Loading requests…</p>
         ) : error ? (
-          <p className="table-state">{error}</p>
+          <RetryState message={error} onRetry={load} />
         ) : listings.length === 0 ? (
           <p className="table-state">No active requests right now.</p>
         ) : (
