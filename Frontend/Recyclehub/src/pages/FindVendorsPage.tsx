@@ -236,7 +236,7 @@ function FindVendorsPage() {
                       className="btn-secondary"
                       onClick={() => setRateVendor(vendor)}
                     >
-                      Rate Vendor
+                      Reviews &amp; rating
                     </button>
                   </div>
                   {state === 'error' && (
