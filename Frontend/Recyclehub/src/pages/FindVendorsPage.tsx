@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import ChatbotWidget from '../components/ChatbotWidget'
 import RetryState from '../components/RetryState'
+import RateVendorModal from '../components/RateVendorModal'
 import { api, ApiError } from '../lib/api'
+import { useAuth } from '../lib/auth'
 import './FindVendorsPage.css'
 
 const MATERIALS = ['Plastic', 'Glass', 'Metal', 'Cardboard', 'Paper', 'Other']
@@ -49,16 +51,35 @@ function vendorMaterials(vendor: VendorProfileResponse): string[] {
 
 function FindVendorsPage() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [vendors, setVendors] = useState<VendorProfileResponse[]>([])
   const [ratings, setRatings] = useState<Record<string, RatingInfo>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [contactState, setContactState] = useState<Record<string, ContactState>>({})
   const [contactError, setContactError] = useState<Record<string, string>>({})
+  const [rateVendor, setRateVendor] = useState<VendorProfileResponse | null>(null)
 
   const [query, setQuery] = useState('')
   const [city, setCity] = useState('')
   const [category, setCategory] = useState('')
+
+  async function loadRatings(list: VendorProfileResponse[]) {
+    const entries = await Promise.all(
+      list.map(async (vendor) => {
+        try {
+          const profile = await api.get<AuthVendorProfile>(`/api/vendors/${vendor.userId}/profile`)
+          return [
+            vendor.userId,
+            { averageRating: profile.averageRating, reviewCount: profile.reviewCount },
+          ] as const
+        } catch {
+          return [vendor.userId, null] as const
+        }
+      }),
+    )
+    setRatings((prev) => ({ ...prev, ...Object.fromEntries(entries) }))
+  }
 
   async function search(q: string, cityFilter: string, categoryFilter: string) {
     setIsLoading(true)
@@ -72,21 +93,7 @@ function FindVendorsPage() {
         category: categoryFilter || undefined,
       })
       setVendors(data)
-
-      const ratingEntries = await Promise.all(
-        data.map(async (vendor) => {
-          try {
-            const profile = await api.get<AuthVendorProfile>(`/api/vendors/${vendor.userId}/profile`)
-            return [
-              vendor.userId,
-              { averageRating: profile.averageRating, reviewCount: profile.reviewCount },
-            ] as const
-          } catch {
-            return [vendor.userId, null] as const
-          }
-        }),
-      )
-      setRatings(Object.fromEntries(ratingEntries))
+      await loadRatings(data)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to load vendors.')
     } finally {
@@ -215,14 +222,23 @@ function FindVendorsPage() {
                     ))}
                   </div>
 
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    disabled={state === 'loading'}
-                    onClick={() => handleContact(vendor)}
-                  >
-                    {state === 'loading' ? 'Opening…' : 'Message Vendor'}
-                  </button>
+                  <div className="vendor-card-actions">
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      disabled={state === 'loading'}
+                      onClick={() => handleContact(vendor)}
+                    >
+                      {state === 'loading' ? 'Opening…' : 'Message Vendor'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => setRateVendor(vendor)}
+                    >
+                      Rate Vendor
+                    </button>
+                  </div>
                   {state === 'error' && (
                     <p className="vendor-contact-error">{contactError[vendor.userId]}</p>
                   )}
@@ -232,6 +248,16 @@ function FindVendorsPage() {
           </div>
         )}
       </main>
+
+      {rateVendor && user && (
+        <RateVendorModal
+          vendorName={rateVendor.vendorName}
+          vendorUserId={rateVendor.userId}
+          reviewerUserId={user.userId}
+          onClose={() => setRateVendor(null)}
+          onRated={() => loadRatings([rateVendor])}
+        />
+      )}
 
       <ChatbotWidget />
     </div>

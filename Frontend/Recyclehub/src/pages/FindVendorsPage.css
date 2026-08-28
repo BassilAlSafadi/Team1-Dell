@@ -117,6 +117,12 @@
 }
 
 .vendor-card .btn-secondary {
-  margin-top: 20px;
   align-self: flex-start;
+}
+
+.vendor-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
 }

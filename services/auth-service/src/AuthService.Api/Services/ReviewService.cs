@@ -15,6 +15,8 @@ public class ReviewService : IReviewService
     private const int MaxPageSize = 50;
     private static readonly TimeSpan VendorProfileCacheTtl = TimeSpan.FromMinutes(5);
 
+    private static string VendorProfileCacheKey(Guid vendorId) => $"cache:auth:vendor-profile:{vendorId}";
+
     private readonly AuthDbContext _db;
     private readonly INotificationPublisher _notifications;
     private readonly IRedisCache _cache;
@@ -67,6 +69,11 @@ public class ReviewService : IReviewService
 
         await _db.SaveChangesAsync(ct);
 
+        // The rating average feeds a badge the reviewer is looking at right now — a 5-minute
+        // stale window is fine for passers-by but jarring for the person who just rated, so
+        // drop the cached profile on write even though the read path is otherwise pure-TTL.
+        await _cache.DeleteAsync(VendorProfileCacheKey(vendorId));
+
         // Real gRPC domain call, per the mesh plan: notify the vendor over gRPC of a new/updated
         // review. Best-effort — notification-service being down must never fail a review write.
         await _notifications.PublishAsync(
@@ -89,6 +96,7 @@ public class ReviewService : IReviewService
 
         _db.Reviews.Remove(review);
         await _db.SaveChangesAsync(ct);
+        await _cache.DeleteAsync(VendorProfileCacheKey(vendorId));
     }
 
     public async Task<VendorProfileResponse> GetVendorProfileAsync(Guid vendorId, CancellationToken ct)
@@ -96,7 +104,7 @@ public class ReviewService : IReviewService
         // Pure TTL-expiry cache-aside, no write-invalidation — read-heavy, slow-changing
         // aggregate; a 5-minute staleness window on a rating average is acceptable (see
         // REDIS_INTEGRATION_PLAN.md §2).
-        var cacheKey = $"cache:auth:vendor-profile:{vendorId}";
+        var cacheKey = VendorProfileCacheKey(vendorId);
         var cached = await _cache.GetStringAsync(cacheKey);
         if (cached is not null)
         {
