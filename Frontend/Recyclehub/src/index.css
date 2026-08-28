@@ -448,6 +448,25 @@ button {
   color: var(--text-h);
 }
 
+/* Landed on from a notification click — marks the specific row/card the notification
+   was about, so clicking through actually shows you the thing, not just the page. */
+@keyframes row-highlight-fade {
+  from {
+    background: var(--green-light);
+  }
+  to {
+    background: transparent;
+  }
+}
+
+.row-highlight {
+  animation: row-highlight-fade 2.4s ease-out 1;
+}
+
+.row-highlight td {
+  background: transparent;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

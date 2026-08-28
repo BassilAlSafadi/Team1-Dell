@@ -79,12 +79,16 @@
   gap: 16px;
 }
 
-.nav-toggle {
+/* Compound selector (.icon-btn.nav-toggle), not just .nav-toggle: .icon-btn's own
+   `display: flex` is defined later in this file, and two single-class selectors of
+   equal specificity resolve by source order — plain .nav-toggle would lose that fight
+   and the button would stay visible at every width, which is exactly what happened. */
+.icon-btn.nav-toggle {
   display: none;
 }
 
 @media (max-width: 900px) {
-  .nav-toggle {
+  .icon-btn.nav-toggle {
     display: flex;
   }
 }

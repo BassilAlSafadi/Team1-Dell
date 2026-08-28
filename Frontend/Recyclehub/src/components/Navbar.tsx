@@ -43,6 +43,74 @@ const navLinksByVariant: Record<NavbarVariant, { label: string; to: string }[]> 
   ],
 }
 
+type NotificationDestination = { path: string; state?: Record<string, unknown> }
+
+type ConversationSummary = { _id: string; listing_id: string | null }
+
+/** Where a notification should take you, based on what it's about — not just marking
+ * it read. Routed primarily off `notification.type` (the fixed NotificationType enum —
+ * see services/notification-service/internal/models/notification.go) rather than
+ * `entity.type`, because `entity.type` isn't reliably the thing you'd expect: real
+ * deal-status notifications do set it to "deal" (DealService), but the demo seed data
+ * (deploy/seed/seed_data.py) stamps every notification's entity as
+ * {type: "listing", id: <listingId>} regardless of what the notification is actually
+ * about, since that's the one id every seeded notification type has on hand. Only use
+ * entity.id for a highlight when its type actually matches what the destination page
+ * expects — otherwise land on the page without one rather than highlight the wrong row. */
+function routeForNotification(notification: NotificationDto, isVendor: boolean): NotificationDestination | null {
+  const entity = notification.entity
+
+  switch (notification.type) {
+    case 'NEW_OFFER':
+      // Recipient is the business whose listing got the offer.
+      return isVendor
+        ? null
+        : { path: '/offers', state: entity?.type === 'offer' ? { highlightOfferId: entity.id } : undefined }
+
+    case 'OFFER_ACCEPTED':
+      // Recipient is the vendor who sent it — there's no "my sent offers" list to land
+      // on, so the closest useful place is their dashboard, which surfaces it under
+      // Recent Requests.
+      return isVendor ? { path: '/vendor-dashboard' } : null
+
+    case 'DEAL_COMPLETED':
+    case 'DEAL_STATUS_CHANGED':
+      return {
+        path: isVendor ? '/vendor-transactions' : '/transactions',
+        state: entity?.type === 'deal' ? { highlightDealId: entity.id } : undefined,
+      }
+
+    case 'NEW_REVIEW':
+      // Recipient is the vendor being reviewed — their profile/rating lives on their
+      // own dashboard, there's no standalone review page.
+      return isVendor ? { path: '/vendor-dashboard' } : null
+
+    default:
+      return null
+  }
+}
+
+/** NEW_MESSAGE notifications carry the listing the message is about, not the
+ * conversation id itself — resolve it by matching listing_id against the caller's
+ * conversations so the click actually opens the right thread, the way FindVendorsPage /
+ * VendorRequestsPage already do when starting a new conversation. Falls back to the
+ * Messages list (no thread pre-selected) if the listing can't be matched to one. */
+async function resolveMessageDestination(notification: NotificationDto): Promise<NotificationDestination> {
+  const listingId = notification.entity?.type === 'listing' ? notification.entity.id : undefined
+  const conversationId = notification.entity?.type === 'conversation' ? notification.entity.id : undefined
+
+  if (conversationId) return { path: '/messages', state: { conversationId } }
+  if (!listingId) return { path: '/messages' }
+
+  try {
+    const conversations = await api.get<ConversationSummary[]>('/api/conversations')
+    const match = conversations.find((c) => c.listing_id === listingId)
+    return { path: '/messages', state: match ? { conversationId: match._id } : undefined }
+  } catch {
+    return { path: '/messages' }
+  }
+}
+
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime()
   const minutes = Math.floor(diffMs / 60000)
@@ -103,17 +171,28 @@ function Navbar({ variant: variantOverride }: { variant?: NavbarVariant }) {
   }, [openMenu])
 
   const handleNotificationClick = async (notification: NotificationDto) => {
-    if (notification.isRead) return
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n)),
-    )
-    setUnreadCount((prev) => Math.max(0, prev - 1))
-    try {
-      await api.patch(`/api/notifications/${notification.id}/read`)
-    } catch {
-      // best-effort optimistic update — a background refresh will reconcile
+    setOpenMenu(null)
+
+    if (!notification.isRead) {
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n)),
+      )
+      setUnreadCount((prev) => Math.max(0, prev - 1))
+      try {
+        await api.patch(`/api/notifications/${notification.id}/read`)
+      } catch {
+        // best-effort optimistic update — a background refresh will reconcile
+      }
+      refreshNotifications()
     }
-    refreshNotifications()
+
+    // Reading it is only half the job — take them to whatever it's actually about.
+    // Works for an already-read notification too, so re-clicking one still gets you there.
+    const destination =
+      notification.type === 'NEW_MESSAGE'
+        ? await resolveMessageDestination(notification)
+        : routeForNotification(notification, isVendor)
+    if (destination) navigate(destination.path, { state: destination.state })
   }
 
   const handleLogout = async () => {

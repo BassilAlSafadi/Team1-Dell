@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import ChatbotWidget from '../components/ChatbotWidget'
 import RetryState from '../components/RetryState'
@@ -104,6 +105,11 @@ async function resolveRows(offers: OfferResponse[]): Promise<Row[]> {
 }
 
 function BusinessOffersPage() {
+  // Set when arriving from a "new offer" notification click — highlights and scrolls
+  // to that offer once the list is loaded.
+  const location = useLocation()
+  const highlightOfferId = (location.state as { highlightOfferId?: string } | null)?.highlightOfferId
+
   const [loading, setLoading] = useState(true)
   const [hasProfile, setHasProfile] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -146,6 +152,11 @@ function BusinessOffersPage() {
     load()
   }, [load])
 
+  useEffect(() => {
+    if (!highlightOfferId || rows.length === 0) return
+    document.getElementById(`offer-${highlightOfferId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [highlightOfferId, rows])
+
   const respond = async (offerId: string, action: 'accept' | 'reject') => {
     setActions((prev) => ({ ...prev, [offerId]: action === 'accept' ? 'accepting' : 'rejecting' }))
     try {
@@ -172,7 +183,11 @@ function BusinessOffersPage() {
     const busy = state === 'accepting' || state === 'rejecting'
 
     return (
-      <article className="offer-card" key={offer.offerId}>
+      <article
+        className={`offer-card${offer.offerId === highlightOfferId ? ' row-highlight' : ''}`}
+        id={`offer-${offer.offerId}`}
+        key={offer.offerId}
+      >
         <div className="offer-card-top">
           <div>
             <h2>{row.vendorName}</h2>
