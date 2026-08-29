@@ -109,11 +109,12 @@
 .role-card {
   text-align: left;
   background: var(--surface);
-  border: 2px solid transparent;
+  border: 2px solid var(--border);
   border-radius: 20px;
   padding: 36px;
   cursor: pointer;
   font-family: inherit;
+  box-shadow: rgba(15, 26, 19, 0.05) 0 2px 8px -2px;
   transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
 
   &:hover {
