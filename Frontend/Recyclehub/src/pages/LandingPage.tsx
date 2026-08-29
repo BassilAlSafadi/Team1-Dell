@@ -27,21 +27,6 @@ const stats = [
   { value: '9,000+', label: 'Active recyclers' },
 ]
 
-const footerColumns = [
-  {
-    heading: 'Product',
-    links: ['Features', 'How it works', 'Locations'],
-  },
-  {
-    heading: 'Company',
-    links: ['About', 'Careers', 'Contact'],
-  },
-  {
-    heading: 'Legal',
-    links: ['Privacy', 'Terms'],
-  },
-]
-
 function LandingPage() {
   return (
     <div className="page">
@@ -220,20 +205,7 @@ function LandingPage() {
               </span>
               <span className="brand-name">RecycleHub</span>
             </div>
-            <p>Recycle smarter. Live greener. One item at a time.</p>
-          </div>
-
-          <div className="footer-links">
-            {footerColumns.map((col) => (
-              <div className="footer-col" key={col.heading}>
-                <h4>{col.heading}</h4>
-                {col.links.map((link) => (
-                  <a href={link === 'How it works' ? '#how-it-works' : '#'} key={link}>
-                    {link}
-                  </a>
-                ))}
-              </div>
-            ))}
+            <p className="footer-slogan">Monetize your Trash</p>
           </div>
         </div>
 
