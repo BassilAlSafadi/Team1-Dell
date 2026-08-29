@@ -42,6 +42,10 @@ type Config struct {
 	RateLimitRPS   int
 	RateLimitBurst int
 
+	// UploadDir is where POST /api/uploads writes files and GET /api/uploads/{name} serves
+	// them from — a bind-mounted directory on the host so uploads outlive container rebuilds.
+	UploadDir string
+
 	// TrustedProxies are the CIDR ranges whose X-Forwarded-For header the rate limiter may
 	// believe. Empty (the default) means trust nothing and key on the peer address, which is
 	// the correct setting when the gateway is itself the edge.
@@ -79,6 +83,8 @@ func Load() (*Config, error) {
 
 		RateLimitRPS:   getEnvInt("RATE_LIMIT_RPS", 20),
 		RateLimitBurst: getEnvInt("RATE_LIMIT_BURST", 40),
+
+		UploadDir: getEnv("UPLOAD_DIR", "/data/uploads"),
 	}
 
 	trustedProxies, err := parseCIDRs(os.Getenv("TRUSTED_PROXIES"))

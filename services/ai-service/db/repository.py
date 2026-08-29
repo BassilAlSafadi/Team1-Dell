@@ -85,11 +85,23 @@ def delete_thread(thread_id: str) -> None:
 # Messages
 # ============================================================
 
-def add_message(thread_id: str, role: MessageRole, content: str) -> str:
+def add_message(
+    thread_id: str,
+    role: MessageRole,
+    content: str,
+    media_name: str | None = None,
+    media_type: str | None = None,
+) -> str:
     """Inserts a message and bumps the parent thread's updated_at so
     list_threads_for_user() can sort by most-recently-active."""
     db = get_database()
-    message = Message(thread_id=thread_id, role=role, content=content)
+    message = Message(
+        thread_id=thread_id,
+        role=role,
+        content=content,
+        media_name=media_name,
+        media_type=media_type,
+    )
 
     result = db[MESSAGES_COLLECTION].insert_one(message.model_dump())
     db[THREADS_COLLECTION].update_one(

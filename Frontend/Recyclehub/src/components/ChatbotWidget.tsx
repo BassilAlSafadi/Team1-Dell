@@ -1,16 +1,42 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { streamChat } from '../lib/api'
+import { toast } from '../lib/toast'
 import './ChatbotWidget.css'
+
+type Attachment = { previewUrl: string; name: string; type: string }
 
 type Message = {
   id: number
   sender: 'bot' | 'user'
   text: string
+  /** What the user attached to this turn, shown inline (chat replies don't echo it back). */
+  attachment?: Attachment
   /** True from the moment a bot message is created until its stream's `done`/`error`
    * event — drives the loading spinner (empty text) vs. growing markdown (has text). */
   isStreaming?: boolean
+}
+
+// A chat attachment is capped at 20 MB — matches ai-service's MAX_CHAT_MEDIA_BYTES.
+const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024
+
+function AttachmentView({ attachment }: { attachment: Attachment }) {
+  if (attachment.type.startsWith('image/')) {
+    return <img className="chatbot-attachment" src={attachment.previewUrl} alt={attachment.name} />
+  }
+  if (attachment.type.startsWith('video/')) {
+    return <video className="chatbot-attachment" src={attachment.previewUrl} controls />
+  }
+  return (
+    <span className="chatbot-file-chip">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
+        <path d="M7 3h7l5 5v13H7z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        <path d="M14 3v5h5" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      </svg>
+      {attachment.name}
+    </span>
+  )
 }
 
 const initialMessages: Message[] = [
@@ -27,16 +53,37 @@ function ChatbotWidget() {
   const [draft, setDraft] = useState('')
   const [threadId, setThreadId] = useState<string | undefined>(undefined)
   const [isSending, setIsSending] = useState(false)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const pickFile = (file: File | undefined) => {
+    if (!file) return
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      toast.error('That file is over 20 MB — please attach a smaller one.')
+      return
+    }
+    setPendingFile(file)
+  }
 
   const handleSend = async (event: FormEvent) => {
     event.preventDefault()
     const text = draft.trim()
-    if (!text || isSending) return
+    const file = pendingFile
+    if ((!text && !file) || isSending) return
 
-    const userMessage: Message = { id: Date.now(), sender: 'user', text }
+    const userMessage: Message = {
+      id: Date.now(),
+      sender: 'user',
+      text,
+      attachment: file
+        ? { previewUrl: URL.createObjectURL(file), name: file.name, type: file.type }
+        : undefined,
+    }
     const botMessageId = Date.now() + 1
     setMessages((prev) => [...prev, userMessage, { id: botMessageId, sender: 'bot', text: '', isStreaming: true }])
     setDraft('')
+    setPendingFile(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
     setIsSending(true)
 
     const setBotText = (updater: (prevText: string) => string) => {
@@ -49,7 +96,7 @@ function ChatbotWidget() {
     }
 
     try {
-      for await (const event of streamChat(text, threadId)) {
+      for await (const event of streamChat(text, threadId, undefined, file ?? undefined)) {
         switch (event.type) {
           case 'delta':
             setBotText((prevText) => prevText + event.text)
@@ -141,14 +188,58 @@ function ChatbotWidget() {
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.text}</ReactMarkdown>
                     </div>
                   ) : (
-                    message.text
+                    <>
+                      {message.attachment && <AttachmentView attachment={message.attachment} />}
+                      {message.text && <span>{message.text}</span>}
+                    </>
                   )}
                 </div>
               ),
             )}
           </div>
 
+          {pendingFile && (
+            <div className="chatbot-pending" role="status">
+              <span className="chatbot-pending-name">📎 {pendingFile.name}</span>
+              <button
+                type="button"
+                aria-label="Remove attachment"
+                onClick={() => {
+                  setPendingFile(null)
+                  if (fileInputRef.current) fileInputRef.current.value = ''
+                }}
+              >
+                ×
+              </button>
+            </div>
+          )}
+
           <form className="chatbot-input-row" onSubmit={handleSend}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="chatbot-file-input"
+              onChange={(event) => pickFile(event.target.files?.[0])}
+              aria-hidden="true"
+              tabIndex={-1}
+            />
+            <button
+              type="button"
+              className="chatbot-attach-btn"
+              aria-label="Attach a file"
+              disabled={isSending}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M21 11.5l-8.5 8.5a5 5 0 0 1-7-7l9-9a3.5 3.5 0 0 1 5 5l-9 9a2 2 0 0 1-3-3l8-8"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
             <input
               type="text"
               placeholder="Type a message…"
@@ -157,7 +248,11 @@ function ChatbotWidget() {
               aria-label="Message"
               disabled={isSending}
             />
-            <button type="submit" aria-label="Send message" disabled={isSending}>
+            <button
+              type="submit"
+              aria-label="Send message"
+              disabled={isSending || (!draft.trim() && !pendingFile)}
+            >
               <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path
                   d="M4 20l16-8L4 4v6l10 2-10 2v6Z"

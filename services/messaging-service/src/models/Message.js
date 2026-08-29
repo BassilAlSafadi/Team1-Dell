@@ -27,7 +27,7 @@ const messageSchema = new Schema(
     conversation_id: { type: Schema.Types.ObjectId, ref: 'Conversation', required: true },
     sender_id: { type: String, required: true }, // EXT -> Auth Service
     content: { type: String, required: true },
-    message_type: { type: String, enum: ['text', 'image', 'file', 'system'], default: 'text' },
+    message_type: { type: String, enum: ['text', 'image', 'video', 'file', 'system'], default: 'text' },
     attachments: { type: [attachmentSchema], default: [] },
     reply_to_message_id: { type: Schema.Types.ObjectId, ref: 'Message', default: null },
     reactions: { type: [reactionSchema], default: [] },

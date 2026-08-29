@@ -98,14 +98,20 @@ class GetRecommendationResponse(_message.Message):
     def __init__(self, recommendation_text: _Optional[str] = ..., generated_at: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class ChatRequest(_message.Message):
-    __slots__ = ("user_id", "message", "thread_id")
+    __slots__ = ("user_id", "message", "thread_id", "media_data", "media_type", "media_name")
     USER_ID_FIELD_NUMBER: _ClassVar[int]
     MESSAGE_FIELD_NUMBER: _ClassVar[int]
     THREAD_ID_FIELD_NUMBER: _ClassVar[int]
+    MEDIA_DATA_FIELD_NUMBER: _ClassVar[int]
+    MEDIA_TYPE_FIELD_NUMBER: _ClassVar[int]
+    MEDIA_NAME_FIELD_NUMBER: _ClassVar[int]
     user_id: str
     message: str
     thread_id: str
-    def __init__(self, user_id: _Optional[str] = ..., message: _Optional[str] = ..., thread_id: _Optional[str] = ...) -> None: ...
+    media_data: bytes
+    media_type: str
+    media_name: str
+    def __init__(self, user_id: _Optional[str] = ..., message: _Optional[str] = ..., thread_id: _Optional[str] = ..., media_data: _Optional[bytes] = ..., media_type: _Optional[str] = ..., media_name: _Optional[str] = ...) -> None: ...
 
 class ChatResponse(_message.Message):
     __slots__ = ("reply", "thread_id")

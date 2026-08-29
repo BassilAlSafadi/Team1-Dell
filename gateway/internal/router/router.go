@@ -7,6 +7,7 @@ package router
 
 import (
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -81,6 +82,15 @@ func New(cfg *config.Config, clients *grpcclients.Clients, limiter ratelimit.Lim
 
 	auth := appmw.OptionalAuth(cfg)
 	requireAuth := appmw.RequireAuth(cfg)
+
+	// --- uploads (shared blob store on local disk) ---
+	// Serving is unauthenticated: the filename carries 128 bits of randomness and <img>/
+	// <video> tags can't attach a bearer header. Uploading requires a valid token.
+	if err := os.MkdirAll(cfg.UploadDir, 0o755); err != nil {
+		return nil, err
+	}
+	r.With(requireAuth).Post("/api/uploads", handlers.Upload(cfg))
+	r.Get("/api/uploads/{name}", handlers.ServeUpload(cfg))
 
 	// --- auth-service ---
 	r.Group(func(r chi.Router) {

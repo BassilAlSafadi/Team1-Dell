@@ -499,10 +499,17 @@ func (x *GetRecommendationResponse) GetGeneratedAt() *timestamppb.Timestamp {
 }
 
 type ChatRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	ThreadId      *string                `protobuf:"bytes,3,opt,name=thread_id,json=threadId,proto3,oneof" json:"thread_id,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	UserId   string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Message  string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	ThreadId *string                `protobuf:"bytes,3,opt,name=thread_id,json=threadId,proto3,oneof" json:"thread_id,omitempty"`
+	// Optional attachment for the turn. media_data is the raw file bytes; media_type is its
+	// MIME type (e.g. image/jpeg, video/mp4, application/pdf); media_name is the original
+	// filename. Images/video/pdf/audio are forwarded to the multimodal model; other types are
+	// referenced by name only. Not replayed on later turns — only the current turn sees it.
+	MediaData     []byte `protobuf:"bytes,4,opt,name=media_data,json=mediaData,proto3" json:"media_data,omitempty"`
+	MediaType     string `protobuf:"bytes,5,opt,name=media_type,json=mediaType,proto3" json:"media_type,omitempty"`
+	MediaName     string `protobuf:"bytes,6,opt,name=media_name,json=mediaName,proto3" json:"media_name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -554,6 +561,27 @@ func (x *ChatRequest) GetMessage() string {
 func (x *ChatRequest) GetThreadId() string {
 	if x != nil && x.ThreadId != nil {
 		return *x.ThreadId
+	}
+	return ""
+}
+
+func (x *ChatRequest) GetMediaData() []byte {
+	if x != nil {
+		return x.MediaData
+	}
+	return nil
+}
+
+func (x *ChatRequest) GetMediaType() string {
+	if x != nil {
+		return x.MediaType
+	}
+	return ""
+}
+
+func (x *ChatRequest) GetMediaName() string {
+	if x != nil {
+		return x.MediaName
 	}
 	return ""
 }
@@ -735,11 +763,17 @@ const file_ai_v1_ai_proto_rawDesc = "" +
 	"scan_limit\x18\x02 \x01(\x05R\tscanLimit\"\x8b\x01\n" +
 	"\x19GetRecommendationResponse\x12/\n" +
 	"\x13recommendation_text\x18\x01 \x01(\tR\x12recommendationText\x12=\n" +
-	"\fgenerated_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\vgeneratedAt\"p\n" +
+	"\fgenerated_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\vgeneratedAt\"\xcd\x01\n" +
 	"\vChatRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12 \n" +
-	"\tthread_id\x18\x03 \x01(\tH\x00R\bthreadId\x88\x01\x01B\f\n" +
+	"\tthread_id\x18\x03 \x01(\tH\x00R\bthreadId\x88\x01\x01\x12\x1d\n" +
+	"\n" +
+	"media_data\x18\x04 \x01(\fR\tmediaData\x12\x1d\n" +
+	"\n" +
+	"media_type\x18\x05 \x01(\tR\tmediaType\x12\x1d\n" +
+	"\n" +
+	"media_name\x18\x06 \x01(\tR\tmediaNameB\f\n" +
 	"\n" +
 	"_thread_id\"A\n" +
 	"\fChatResponse\x12\x14\n" +

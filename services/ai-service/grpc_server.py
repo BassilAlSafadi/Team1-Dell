@@ -13,6 +13,7 @@ directly/manually; this is a new, additional entrypoint.
 from __future__ import annotations
 
 import asyncio
+import base64
 import logging
 import os
 import queue
@@ -48,7 +49,11 @@ from internal_auth import InternalAuthInterceptor  # noqa: E402
 from langchain_core.messages import AIMessage, HumanMessage  # noqa: E402
 from mesh_status import start_mesh_status_server  # noqa: E402
 from vendor_cache import get_vendor_recommendations  # noqa: E402
-from waste_classifier import WasteClassifier, save_classification_result  # noqa: E402
+from waste_classifier import (  # noqa: E402
+    WasteClassifier,
+    encode_image_bytes,
+    save_classification_result,
+)
 from waste_recommendations import (  # noqa: E402
     analyze_waste,
     analyze_weekly_trends,
@@ -64,6 +69,10 @@ GRPC_PORT = os.getenv("GRPC_PORT", "6005")
 _NOTIFICATION_CALL_TIMEOUT_SECONDS = 3.0
 
 MAX_CHAT_MESSAGE_CHARS = 8000
+# Chat attachment ceiling. Larger media is acknowledged by name but not sent to the model.
+MAX_CHAT_MEDIA_BYTES = 20 * 1024 * 1024
+_INLINE_MEDIA_PREFIXES = ("video/", "audio/")
+_INLINE_MEDIA_TYPES = {"application/pdf"}
 DEFAULT_SCAN_LIMIT = 200
 MAX_SCAN_LIMIT = 1000
 
@@ -99,6 +108,51 @@ def _vendors_by_category_to_proto(vendors_by_category: dict) -> dict:
             )
         proto_map[category] = ai_pb2.VendorList(vendors=proto_vendors)
     return proto_map
+
+
+def _build_user_turn(request: ai_pb2.ChatRequest) -> tuple[HumanMessage, str]:
+    """Builds this turn's HumanMessage (multimodal when media is attached) and the text to
+    persist. Media bytes are never stored and are only seen by the model on the turn they
+    arrive — history replay stays text-only to keep the context bounded."""
+    text = request.message or ""
+    media = request.media_data
+    if not media:
+        return HumanMessage(content=text), text
+
+    name = request.media_name or "attachment"
+    mime = (request.media_type or "").lower()
+
+    if len(media) > MAX_CHAT_MEDIA_BYTES:
+        note = f"[attached file: {name} — too large for me to open]"
+        return HumanMessage(content=f"{text}\n\n{note}".strip()), (text or note)
+
+    parts: list = []
+    if text:
+        parts.append({"type": "text", "text": text})
+
+    if mime.startswith("image/"):
+        encoded, out_mime = encode_image_bytes(media)
+        data_uri = f"data:{out_mime};base64,{encoded}"
+        parts.append({"type": "image_url", "image_url": {"url": data_uri}})
+        stored = text or f"[image: {name}]"
+    elif mime.startswith(_INLINE_MEDIA_PREFIXES) or mime in _INLINE_MEDIA_TYPES:
+        parts.append(
+            {"type": "media", "mime_type": mime, "data": base64.b64encode(media).decode("utf-8")}
+        )
+        stored = text or f"[media: {name}]"
+    else:
+        parts.append(
+            {
+                "type": "text",
+                "text": (
+                    f"[attached file: {name} ({mime or 'unknown type'}) "
+                    "— I can't read this file type]"
+                ),
+            }
+        )
+        stored = text or f"[file: {name}]"
+
+    return HumanMessage(content=parts), stored
 
 
 class AiServiceServicer(ai_pb2_grpc.AiServiceServicer):
@@ -190,7 +244,7 @@ class AiServiceServicer(ai_pb2_grpc.AiServiceServicer):
         )
 
     async def Chat(self, request: ai_pb2.ChatRequest, context):
-        if not request.message or not request.message.strip():
+        if (not request.message or not request.message.strip()) and not request.media_data:
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "message must not be empty.")
             return ai_pb2.ChatResponse()
 
@@ -270,7 +324,7 @@ class AiServiceServicer(ai_pb2_grpc.AiServiceServicer):
         scratch (see attempt()), so a 'reset' chunk tells the client to discard whatever
         text_delta it has already rendered for this turn before the retry's deltas arrive.
         """
-        if not request.message or not request.message.strip():
+        if (not request.message or not request.message.strip()) and not request.media_data:
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "message must not be empty.")
             return
 
@@ -307,8 +361,15 @@ class AiServiceServicer(ai_pb2_grpc.AiServiceServicer):
             thread_id = create_thread(request.user_id)
             messages = new_conversation()
 
-        messages.append(HumanMessage(content=request.message))
-        add_message(thread_id, "human", request.message)
+        user_message, stored_text = _build_user_turn(request)
+        messages.append(user_message)
+        add_message(
+            thread_id,
+            "human",
+            stored_text,
+            media_name=request.media_name or None,
+            media_type=request.media_type or None,
+        )
 
         checkpoint = len(messages)
         response_chunks: list[str] = []

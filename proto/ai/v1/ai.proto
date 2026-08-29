@@ -73,6 +73,13 @@ message ChatRequest {
   string user_id = 1;
   string message = 2;
   optional string thread_id = 3;
+  // Optional attachment for the turn. media_data is the raw file bytes; media_type is its
+  // MIME type (e.g. image/jpeg, video/mp4, application/pdf); media_name is the original
+  // filename. Images/video/pdf/audio are forwarded to the multimodal model; other types are
+  // referenced by name only. Not replayed on later turns — only the current turn sees it.
+  bytes media_data = 4;
+  string media_type = 5;
+  string media_name = 6;
 }
 
 message ChatResponse {

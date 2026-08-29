@@ -169,7 +169,7 @@
   border-top: 1px solid var(--border);
   flex-shrink: 0;
 
-  input {
+  input[type='text'] {
     flex: 1;
     padding: 10px 14px;
     border-radius: 999px;
@@ -186,4 +186,91 @@
       box-shadow: 0 0 0 3px var(--green-light);
     }
   }
+}
+
+.compose-file-input {
+  display: none;
+}
+
+.compose-attach-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+
+  &:hover {
+    background: var(--green-light);
+    color: var(--green-dark);
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.compose-pending {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 20px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--green-light);
+  font-size: 13px;
+  color: var(--text-h);
+
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  button {
+    border: none;
+    background: none;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--text);
+  }
+}
+
+.thread-attachments {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.thread-attachment {
+  display: block;
+  max-width: 100%;
+  max-height: 260px;
+  border-radius: 10px;
+}
+
+.thread-file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.08);
+  color: inherit;
+  font-size: 13px;
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.thread-message.mine .thread-file-chip {
+  background: rgba(255, 255, 255, 0.2);
 }

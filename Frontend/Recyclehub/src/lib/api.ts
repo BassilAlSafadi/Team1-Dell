@@ -1,6 +1,12 @@
 const API_BASE_URL: string =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:8080'
 
+/** Turns a gateway-relative path (e.g. an `/api/uploads/…` attachment url) into an absolute
+ * URL against the configured API base, for use as an `<img>`/`<video>`/`<a>` src. */
+export const apiUrl = (path: string): string => new URL(path, API_BASE_URL).toString()
+
+export type UploadedFile = { url: string; type: string; name: string; size: number }
+
 export class ApiError extends Error {
   status: number
 
@@ -165,16 +171,31 @@ export async function* streamChat(
   message: string,
   threadId: string | undefined,
   signal?: AbortSignal,
+  media?: File,
 ): AsyncGenerator<ChatStreamEvent> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const headers: Record<string, string> = {}
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`
+
+  // With an attachment the turn goes as multipart/form-data (message + threadId + media file);
+  // the browser sets the Content-Type + boundary itself, so it must not be set here.
+  let body: BodyInit
+  if (media) {
+    const form = new FormData()
+    form.append('message', message)
+    if (threadId) form.append('threadId', threadId)
+    form.append('media', media)
+    body = form
+  } else {
+    headers['Content-Type'] = 'application/json'
+    body = JSON.stringify({ message, threadId })
+  }
 
   let res: Response
   try {
     res = await fetch(buildUrl('/api/ai/chat/stream'), {
       method: 'POST',
       headers,
-      body: JSON.stringify({ message, threadId }),
+      body,
       signal,
     })
   } catch {
@@ -244,4 +265,10 @@ export const api = {
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
   postRaw: <T>(path: string, body: BodyInit, query?: RequestOptions['query']) =>
     request<T>(path, { method: 'POST', body, raw: true, query }),
+  /** Uploads one file to the gateway blob store, returning its stored descriptor. */
+  upload: (file: File, signal?: AbortSignal) => {
+    const form = new FormData()
+    form.append('file', file)
+    return request<UploadedFile>('/api/uploads', { method: 'POST', body: form, raw: true, signal })
+  },
 }

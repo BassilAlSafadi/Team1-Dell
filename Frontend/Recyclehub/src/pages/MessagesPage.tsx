@@ -3,9 +3,15 @@ import { useLocation } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import ChatbotWidget from '../components/ChatbotWidget'
 import RetryState from '../components/RetryState'
-import { api, ApiError } from '../lib/api'
+import { api, ApiError, apiUrl } from '../lib/api'
+import { toast } from '../lib/toast'
 import { useAuth } from '../lib/auth'
 import './MessagesPage.css'
+
+type MessageAttachment = { url: string; type: string; name: string; size: number }
+
+// Matches the gateway's 50 MB upload cap.
+const MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024
 
 // messaging-service is proxied through the gateway as-is (no REST transform layer like the
 // .NET services get), so these mirror its Mongoose schemas' snake_case fields verbatim.
@@ -30,6 +36,7 @@ type MessageDto = {
   sender_id: string
   content: string
   message_type: string
+  attachments?: MessageAttachment[]
   created_at: string
 }
 
@@ -49,6 +56,27 @@ function formatTime(iso: string): string {
   }
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' +
     date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+}
+
+function MessageAttachments({ attachments }: { attachments: MessageAttachment[] }) {
+  return (
+    <div className="thread-attachments">
+      {attachments.map((a) => {
+        const href = apiUrl(a.url)
+        if (a.type.startsWith('image/')) {
+          return <img key={a.url} className="thread-attachment" src={href} alt={a.name} />
+        }
+        if (a.type.startsWith('video/')) {
+          return <video key={a.url} className="thread-attachment" src={href} controls />
+        }
+        return (
+          <a key={a.url} className="thread-file-chip" href={href} download={a.name} target="_blank" rel="noreferrer">
+            📎 {a.name}
+          </a>
+        )
+      })}
+    </div>
+  )
 }
 
 function initials(name: string): string {
@@ -71,6 +99,8 @@ function MessagesPage() {
   )
   const [messages, setMessages] = useState<MessageDto[]>([])
   const [draft, setDraft] = useState('')
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [isLoadingList, setIsLoadingList] = useState(true)
   const [isLoadingThread, setIsLoadingThread] = useState(false)
@@ -165,17 +195,41 @@ function MessagesPage() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages.length])
 
+  const pickFile = (file: File | undefined) => {
+    if (!file) return
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      toast.error('That file is over 50 MB — please attach a smaller one.')
+      return
+    }
+    setPendingFile(file)
+  }
+
+  const clearPendingFile = () => {
+    setPendingFile(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
   const handleSend = async (event: FormEvent) => {
     event.preventDefault()
     const content = draft.trim()
-    if (!content || !selectedId || isSending) return
+    const file = pendingFile
+    if ((!content && !file) || !selectedId || isSending) return
 
     setIsSending(true)
     setThreadError(null)
     try {
-      const message = await api.post<MessageDto>(`/api/conversations/${selectedId}/messages`, { content })
+      let attachments: MessageAttachment[] | undefined
+      if (file) {
+        const uploaded = await api.upload(file)
+        attachments = [uploaded]
+      }
+      const message = await api.post<MessageDto>(`/api/conversations/${selectedId}/messages`, {
+        content: content || undefined,
+        attachments,
+      })
       setMessages((prev) => [...prev, message])
       setDraft('')
+      clearPendingFile()
     } catch (err) {
       setThreadError(err instanceof ApiError ? err.message : 'Failed to send message.')
     } finally {
@@ -276,7 +330,12 @@ function MessagesPage() {
                         className={`thread-message ${message.sender_id === user?.userId ? 'mine' : 'theirs'}`}
                         key={message._id}
                       >
-                        <p>{message.content}</p>
+                        {message.attachments && message.attachments.length > 0 && (
+                          <MessageAttachments attachments={message.attachments} />
+                        )}
+                        {message.content && !(message.attachments?.length && message.content.startsWith('📎 ')) && (
+                          <p>{message.content}</p>
+                        )}
                         <span className="thread-message-time">{formatTime(message.created_at)}</span>
                       </div>
                     ))
@@ -284,7 +343,41 @@ function MessagesPage() {
                   <div ref={bottomRef} />
                 </div>
 
+                {pendingFile && (
+                  <div className="compose-pending" role="status">
+                    <span>📎 {pendingFile.name}</span>
+                    <button type="button" aria-label="Remove attachment" onClick={clearPendingFile}>
+                      ×
+                    </button>
+                  </div>
+                )}
+
                 <form className="thread-compose" onSubmit={handleSend}>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="compose-file-input"
+                    onChange={(event) => pickFile(event.target.files?.[0])}
+                    aria-hidden="true"
+                    tabIndex={-1}
+                  />
+                  <button
+                    type="button"
+                    className="compose-attach-btn"
+                    aria-label="Attach a file"
+                    disabled={isSending}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path
+                        d="M21 11.5l-8.5 8.5a5 5 0 0 1-7-7l9-9a3.5 3.5 0 0 1 5 5l-9 9a2 2 0 0 1-3-3l8-8"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
                   <input
                     type="text"
                     placeholder="Type a message…"
@@ -293,8 +386,12 @@ function MessagesPage() {
                     aria-label="Message"
                     disabled={isSending}
                   />
-                  <button type="submit" className="btn-primary" disabled={isSending || !draft.trim()}>
-                    Send
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    disabled={isSending || (!draft.trim() && !pendingFile)}
+                  >
+                    {isSending ? 'Sending…' : 'Send'}
                   </button>
                 </form>
               </>

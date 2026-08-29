@@ -19,27 +19,39 @@ const sendMessage = asyncHandler(async (req, res) => {
   await assertParticipant(conversationId, req.userId);
 
   const { content, messageType, attachments, replyToMessageId } = req.body;
-  if (!content || typeof content !== 'string') {
-    throw new HttpError(400, 'content is required.');
+
+  const text = typeof content === 'string' ? content : '';
+  if (attachments !== undefined && (!Array.isArray(attachments) || attachments.length > MAX_ATTACHMENTS)) {
+    throw new HttpError(400, `attachments must be an array of at most ${MAX_ATTACHMENTS} items.`);
+  }
+  const cleanAttachments = normalizeAttachments(attachments);
+  // A message must carry something — text, an attachment, or both.
+  if (!text && cleanAttachments.length === 0) {
+    throw new HttpError(400, 'content or an attachment is required.');
   }
   // Unbounded content/attachments went straight into the document; cap them so one request
   // can't write an arbitrarily large record.
-  if (content.length > MAX_CONTENT_LENGTH) {
+  if (text.length > MAX_CONTENT_LENGTH) {
     throw new HttpError(400, `content must be at most ${MAX_CONTENT_LENGTH} characters.`);
-  }
-  if (attachments !== undefined && (!Array.isArray(attachments) || attachments.length > MAX_ATTACHMENTS)) {
-    throw new HttpError(400, `attachments must be an array of at most ${MAX_ATTACHMENTS} items.`);
   }
   if (replyToMessageId && !mongoose.isValidObjectId(replyToMessageId)) {
     throw new HttpError(400, 'Invalid replyToMessageId.');
   }
 
+  const resolvedType =
+    messageType && messageType !== 'text'
+      ? messageType
+      : cleanAttachments.length > 0
+        ? attachmentKind(cleanAttachments[0].type)
+        : 'text';
+  const preview = text || `📎 ${cleanAttachments[0]?.name || 'attachment'}`;
+
   const message = await Message.create({
     conversation_id: conversationId,
     sender_id: req.userId,
-    content,
-    message_type: messageType || 'text',
-    attachments: attachments || [],
+    content: text || preview,
+    message_type: resolvedType,
+    attachments: cleanAttachments,
     reply_to_message_id: replyToMessageId || null,
   });
 
@@ -48,7 +60,7 @@ const sendMessage = asyncHandler(async (req, res) => {
       last_message: {
         message_id: message._id,
         sender_id: req.userId,
-        content_preview: content.slice(0, PREVIEW_LENGTH),
+        content_preview: preview.slice(0, PREVIEW_LENGTH),
         sent_at: message.created_at,
       },
       updated_at: new Date(),
@@ -61,7 +73,7 @@ const sendMessage = asyncHandler(async (req, res) => {
   }
 
   // Best-effort: a notification-service outage must never break sending a message.
-  notifyOtherParticipants(conversation, conversationId, req.userId, content).catch((err) => {
+  notifyOtherParticipants(conversation, conversationId, req.userId, preview).catch((err) => {
     console.error('Failed to notify conversation participants:', err.message);
   });
 
@@ -85,7 +97,7 @@ function notifyOtherParticipants(conversation, conversationId, senderId, content
               user_id: recipient.user_id,
               type: 'NEW_MESSAGE',
               title: 'New message',
-              body: content.slice(0, PREVIEW_LENGTH),
+              body: content.slice(0, PREVIEW_LENGTH), // caller passes the already-built preview
               actor_id: senderId,
               entity: { type: 'conversation', id: conversationId },
             },
@@ -94,6 +106,36 @@ function notifyOtherParticipants(conversation, conversationId, senderId, content
         })
     )
   );
+}
+
+// Validates and trims the attachments array to the { url, type, name, size } shape the
+// Message schema stores. `url` must be one of our own gateway upload paths — never an
+// arbitrary external URL a client could point at anything.
+function normalizeAttachments(attachments) {
+  if (!Array.isArray(attachments)) return [];
+  return attachments.map((a, i) => {
+    if (!a || typeof a !== 'object') throw new HttpError(400, `attachments[${i}] must be an object.`);
+    if (typeof a.url !== 'string' || !a.url.startsWith('/api/uploads/')) {
+      throw new HttpError(400, `attachments[${i}].url must be an /api/uploads/ path.`);
+    }
+    if (typeof a.type !== 'string' || typeof a.name !== 'string') {
+      throw new HttpError(400, `attachments[${i}] must have string type and name.`);
+    }
+    const size = Number(a.size);
+    return {
+      url: a.url,
+      type: a.type,
+      name: a.name.slice(0, 255),
+      size: Number.isFinite(size) && size >= 0 ? size : 0,
+    };
+  });
+}
+
+// Maps a MIME type to the Message.message_type bucket used for rendering.
+function attachmentKind(mime) {
+  if (typeof mime === 'string' && mime.startsWith('image/')) return 'image';
+  if (typeof mime === 'string' && mime.startsWith('video/')) return 'video';
+  return 'file';
 }
 
 // GET /api/conversations/:id/messages?limit=30&before=<ISO date>

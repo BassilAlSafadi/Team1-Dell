@@ -27,6 +27,11 @@ class Message(BaseModel):
     thread_id: str
     role: MessageRole
     content: str
+    # Metadata for an attachment sent with this turn, for rendering a chip when the thread is
+    # reloaded. The bytes themselves are never stored, and the model only sees the attachment
+    # on the turn it was sent — it is not replayed into later turns.
+    media_name: str | None = None
+    media_type: str | None = None
     created_at: datetime = Field(default_factory=utcnow)
 
 

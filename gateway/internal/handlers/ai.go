@@ -143,28 +143,32 @@ func Chat(client aiv1.AiServiceClient) http.HandlerFunc {
 			return
 		}
 
-		var body struct {
-			Message  string `json:"message"`
-			ThreadID string `json:"threadId"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			transform.WriteError(w, http.StatusBadRequest, "Invalid JSON body: "+err.Error())
+		message, threadID, media, mediaType, mediaName, err := readChatRequest(w, r)
+		if err != nil {
+			transform.WriteError(w, http.StatusBadRequest, "Invalid request body: "+err.Error())
 			return
 		}
-		if body.Message == "" {
+		if message == "" && len(media) == 0 {
 			transform.WriteError(w, http.StatusBadRequest, "message is required.")
 			return
 		}
 
-		ctx, cancel := context.WithTimeout(transform.WithIdentity(r.Context(), r), 60*time.Second)
+		timeout := 60 * time.Second
+		if len(media) > 0 {
+			timeout = 180 * time.Second
+		}
+		ctx, cancel := context.WithTimeout(transform.WithIdentity(r.Context(), r), timeout)
 		defer cancel()
 
 		req := &aiv1.ChatRequest{
-			UserId:  userID,
-			Message: body.Message,
+			UserId:    userID,
+			Message:   message,
+			MediaData: media,
+			MediaType: mediaType,
+			MediaName: mediaName,
 		}
-		if body.ThreadID != "" {
-			req.ThreadId = &body.ThreadID
+		if threadID != "" {
+			req.ThreadId = &threadID
 		}
 
 		resp, err := client.Chat(ctx, req)
@@ -191,15 +195,12 @@ func ChatStream(client aiv1.AiServiceClient) http.HandlerFunc {
 			return
 		}
 
-		var body struct {
-			Message  string `json:"message"`
-			ThreadID string `json:"threadId"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			transform.WriteError(w, http.StatusBadRequest, "Invalid JSON body: "+err.Error())
+		message, threadID, media, mediaType, mediaName, err := readChatRequest(w, r)
+		if err != nil {
+			transform.WriteError(w, http.StatusBadRequest, "Invalid request body: "+err.Error())
 			return
 		}
-		if body.Message == "" {
+		if message == "" && len(media) == 0 {
 			transform.WriteError(w, http.StatusBadRequest, "message is required.")
 			return
 		}
@@ -210,15 +211,23 @@ func ChatStream(client aiv1.AiServiceClient) http.HandlerFunc {
 			return
 		}
 
-		ctx, cancel := context.WithTimeout(transform.WithIdentity(r.Context(), r), 120*time.Second)
+		// Vision/media turns run noticeably longer than text-only ones.
+		timeout := 120 * time.Second
+		if len(media) > 0 {
+			timeout = 180 * time.Second
+		}
+		ctx, cancel := context.WithTimeout(transform.WithIdentity(r.Context(), r), timeout)
 		defer cancel()
 
 		req := &aiv1.ChatRequest{
-			UserId:  userID,
-			Message: body.Message,
+			UserId:    userID,
+			Message:   message,
+			MediaData: media,
+			MediaType: mediaType,
+			MediaName: mediaName,
 		}
-		if body.ThreadID != "" {
-			req.ThreadId = &body.ThreadID
+		if threadID != "" {
+			req.ThreadId = &threadID
 		}
 
 		stream, err := client.ChatStream(ctx, req)
@@ -274,6 +283,50 @@ func writeSSE(w http.ResponseWriter, payload any) {
 	_, _ = w.Write([]byte("data: "))
 	_, _ = w.Write(data)
 	_, _ = w.Write([]byte("\n\n"))
+}
+
+// maxChatMediaBytes caps a chat attachment. Kept under the classifier upload cap and well
+// under Gemini's inline-data ceiling; ai-service enforces its own limit too.
+const maxChatMediaBytes = 20 << 20
+
+// readChatRequest pulls the chat turn out of either a JSON body ({message, threadId}) or a
+// multipart/form-data body (message, threadId, and an optional "media" file field). The
+// multipart form is what the browser sends when the user attaches a photo/video/file.
+func readChatRequest(w http.ResponseWriter, r *http.Request) (message, threadID string, media []byte, mediaType, mediaName string, err error) {
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+		r.Body = http.MaxBytesReader(w, r.Body, maxChatMediaBytes+(1<<20))
+		if err = r.ParseMultipartForm(8 << 20); err != nil {
+			return "", "", nil, "", "", err
+		}
+		message = r.FormValue("message")
+		threadID = r.FormValue("threadId")
+
+		file, header, ferr := r.FormFile("media")
+		if ferr != nil {
+			return message, threadID, nil, "", "", nil // form with no file is fine
+		}
+		defer file.Close()
+
+		media, err = io.ReadAll(file)
+		if err != nil {
+			return "", "", nil, "", "", err
+		}
+		mediaName = header.Filename
+		mediaType = header.Header.Get("Content-Type")
+		if mediaType == "" {
+			mediaType = http.DetectContentType(media)
+		}
+		return message, threadID, media, mediaType, mediaName, nil
+	}
+
+	var body struct {
+		Message  string `json:"message"`
+		ThreadID string `json:"threadId"`
+	}
+	if err = json.NewDecoder(r.Body).Decode(&body); err != nil {
+		return "", "", nil, "", "", err
+	}
+	return body.Message, body.ThreadID, nil, "", "", nil
 }
 
 func readImage(w http.ResponseWriter, r *http.Request) (data []byte, name string, err error) {

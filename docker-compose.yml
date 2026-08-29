@@ -32,8 +32,13 @@ services:
       MESSAGING_REST_ADDR: "messaging-service:8080"
       NOTIFICATION_REST_ADDR: "notification-service:8080"
       MARKETPLACE_REST_ADDR: "marketplace-service:8080"
+      # Shared blob store for chat/message attachments — bind-mounted below so uploads
+      # outlive container rebuilds.
+      UPLOAD_DIR: "/data/uploads"
     ports:
       - "8080:8080"
+    volumes:
+      - ./data/uploads:/data/uploads
     depends_on: [auth-service, transaction-service, messaging-service, notification-service, ai-service, marketplace-service]
     networks: [mesh]
 
