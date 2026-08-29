@@ -7,6 +7,27 @@ export const apiUrl = (path: string): string => new URL(path, API_BASE_URL).toSt
 
 export type UploadedFile = { url: string; type: string; name: string; size: number }
 
+export type ChatThreadSummary = {
+  threadId: string
+  title: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type ChatHistoryMessage = {
+  role: 'human' | 'ai'
+  content: string
+  mediaName: string
+  mediaType: string
+  createdAt: string
+}
+
+export type ChatThread = {
+  threadId: string
+  title: string
+  messages: ChatHistoryMessage[]
+}
+
 export class ApiError extends Error {
   status: number
 

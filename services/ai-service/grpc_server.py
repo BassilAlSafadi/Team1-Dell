@@ -40,7 +40,10 @@ from chatbot.agent import build_llm, new_conversation, run_turn  # noqa: E402
 from db.repository import (  # noqa: E402
     add_message,
     create_thread,
+    delete_thread,
     get_messages_for_thread,
+    get_thread,
+    list_threads_for_user,
     thread_belongs_to,
 )
 from gemini_keys import call_with_gemini_fallback  # noqa: E402
@@ -429,6 +432,62 @@ class AiServiceServicer(ai_pb2_grpc.AiServiceServicer):
             logger.exception("Failed to persist assistant reply")
 
         yield ai_pb2.ChatChunk(thread_id=thread_id, done=True)
+
+    async def ListChatThreads(self, request: ai_pb2.ListChatThreadsRequest, context):
+        threads = list_threads_for_user(request.user_id)
+        return ai_pb2.ListChatThreadsResponse(
+            threads=[
+                ai_pb2.ChatThreadSummary(
+                    thread_id=t["_id"],
+                    title=t.get("title") or "",
+                    created_at=_to_timestamp(t.get("created_at")),
+                    updated_at=_to_timestamp(t.get("updated_at")),
+                )
+                for t in threads
+            ]
+        )
+
+    async def GetChatThread(self, request: ai_pb2.GetChatThreadRequest, context):
+        if not thread_belongs_to(request.thread_id, request.user_id):
+            await context.abort(
+                grpc.StatusCode.PERMISSION_DENIED,
+                "That conversation does not exist or does not belong to you.",
+            )
+            return ai_pb2.GetChatThreadResponse()
+
+        thread = get_thread(request.thread_id) or {}
+        return ai_pb2.GetChatThreadResponse(
+            thread_id=request.thread_id,
+            title=thread.get("title") or "",
+            messages=[
+                ai_pb2.ChatHistoryMessage(
+                    role=m["role"],
+                    content=m.get("content") or "",
+                    media_name=m.get("media_name") or "",
+                    media_type=m.get("media_type") or "",
+                    created_at=_to_timestamp(m.get("created_at")),
+                )
+                for m in get_messages_for_thread(request.thread_id)
+            ],
+        )
+
+    async def DeleteChatThread(self, request: ai_pb2.DeleteChatThreadRequest, context):
+        if not thread_belongs_to(request.thread_id, request.user_id):
+            await context.abort(
+                grpc.StatusCode.PERMISSION_DENIED,
+                "That conversation does not exist or does not belong to you.",
+            )
+            return ai_pb2.DeleteChatThreadResponse()
+
+        delete_thread(request.thread_id)
+        return ai_pb2.DeleteChatThreadResponse()
+
+
+def _to_timestamp(value) -> timestamp_pb2.Timestamp:
+    ts = timestamp_pb2.Timestamp()
+    if value is not None:
+        ts.FromDatetime(value)
+    return ts
 
 
 async def serve() -> None:

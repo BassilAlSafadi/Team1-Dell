@@ -57,6 +57,21 @@ class AiServiceStub(object):
                 request_serializer=ai__pb2.ChatRequest.SerializeToString,
                 response_deserializer=ai__pb2.ChatChunk.FromString,
                 _registered_method=True)
+        self.ListChatThreads = channel.unary_unary(
+                '/ai.v1.AiService/ListChatThreads',
+                request_serializer=ai__pb2.ListChatThreadsRequest.SerializeToString,
+                response_deserializer=ai__pb2.ListChatThreadsResponse.FromString,
+                _registered_method=True)
+        self.GetChatThread = channel.unary_unary(
+                '/ai.v1.AiService/GetChatThread',
+                request_serializer=ai__pb2.GetChatThreadRequest.SerializeToString,
+                response_deserializer=ai__pb2.GetChatThreadResponse.FromString,
+                _registered_method=True)
+        self.DeleteChatThread = channel.unary_unary(
+                '/ai.v1.AiService/DeleteChatThread',
+                request_serializer=ai__pb2.DeleteChatThreadRequest.SerializeToString,
+                response_deserializer=ai__pb2.DeleteChatThreadResponse.FromString,
+                _registered_method=True)
 
 
 class AiServiceServicer(object):
@@ -93,6 +108,27 @@ class AiServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ListChatThreads(self, request, context):
+        """Chatbot conversation history, scoped to the caller. ListChatThreads returns the
+        caller's past conversations newest-first; GetChatThread returns one thread's full
+        message list; DeleteChatThread removes a thread and its messages.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetChatThread(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteChatThread(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_AiServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -115,6 +151,21 @@ def add_AiServiceServicer_to_server(servicer, server):
                     servicer.ChatStream,
                     request_deserializer=ai__pb2.ChatRequest.FromString,
                     response_serializer=ai__pb2.ChatChunk.SerializeToString,
+            ),
+            'ListChatThreads': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListChatThreads,
+                    request_deserializer=ai__pb2.ListChatThreadsRequest.FromString,
+                    response_serializer=ai__pb2.ListChatThreadsResponse.SerializeToString,
+            ),
+            'GetChatThread': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetChatThread,
+                    request_deserializer=ai__pb2.GetChatThreadRequest.FromString,
+                    response_serializer=ai__pb2.GetChatThreadResponse.SerializeToString,
+            ),
+            'DeleteChatThread': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteChatThread,
+                    request_deserializer=ai__pb2.DeleteChatThreadRequest.FromString,
+                    response_serializer=ai__pb2.DeleteChatThreadResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -228,6 +279,87 @@ class AiService(object):
             '/ai.v1.AiService/ChatStream',
             ai__pb2.ChatRequest.SerializeToString,
             ai__pb2.ChatChunk.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListChatThreads(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/ai.v1.AiService/ListChatThreads',
+            ai__pb2.ListChatThreadsRequest.SerializeToString,
+            ai__pb2.ListChatThreadsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetChatThread(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/ai.v1.AiService/GetChatThread',
+            ai__pb2.GetChatThreadRequest.SerializeToString,
+            ai__pb2.GetChatThreadResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteChatThread(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/ai.v1.AiService/DeleteChatThread',
+            ai__pb2.DeleteChatThreadRequest.SerializeToString,
+            ai__pb2.DeleteChatThreadResponse.FromString,
             options,
             channel_credentials,
             insecure,

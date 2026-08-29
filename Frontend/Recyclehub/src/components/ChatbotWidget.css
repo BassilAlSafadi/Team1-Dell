@@ -137,12 +137,19 @@
   color: rgba(255, 255, 255, 0.85);
 }
 
-.chatbot-close {
+.chatbot-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.chatbot-icon-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 28px;
   height: 28px;
+  flex-shrink: 0;
   border: none;
   border-radius: 999px;
   background: transparent;
@@ -161,6 +168,92 @@
   &:focus-visible {
     outline: 2px solid #fff;
     outline-offset: 2px;
+  }
+}
+
+/* --- history list --- */
+.chatbot-history {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--surface);
+}
+
+.chatbot-history-state {
+  padding: 20px;
+  font-size: 14px;
+  color: var(--text);
+  text-align: center;
+}
+
+.chatbot-history ul {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.chatbot-history li {
+  display: flex;
+  align-items: stretch;
+  border-radius: 10px;
+
+  &:hover {
+    background: #fff;
+  }
+  &.is-active {
+    background: #fff;
+    box-shadow: inset 3px 0 0 var(--green);
+  }
+}
+
+.chatbot-history-item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border: none;
+  background: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chatbot-history-title {
+  font-size: 14px;
+  color: var(--text-h);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chatbot-history-time {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.chatbot-history-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  border-radius: 0 10px 10px 0;
+
+  &:hover {
+    color: var(--danger);
+    background: var(--danger-light);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--green-dark);
+    outline-offset: -2px;
   }
 }
 

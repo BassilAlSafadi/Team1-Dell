@@ -109,6 +109,14 @@ def add_message(
         {"$set": {"updated_at": message.created_at}},
     )
 
+    # Give the thread a title the first time the user says something, so the history list
+    # has a meaningful label instead of a bare id. Only fills an empty title.
+    if role == "human" and content.strip():
+        db[THREADS_COLLECTION].update_one(
+            {"_id": ObjectId(thread_id), "$or": [{"title": None}, {"title": ""}]},
+            {"$set": {"title": content.strip()[:80]}},
+        )
+
     return str(result.inserted_id)
 
 

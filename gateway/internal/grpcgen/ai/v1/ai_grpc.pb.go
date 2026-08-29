@@ -23,6 +23,9 @@ const (
 	AiService_GetRecommendation_FullMethodName = "/ai.v1.AiService/GetRecommendation"
 	AiService_Chat_FullMethodName              = "/ai.v1.AiService/Chat"
 	AiService_ChatStream_FullMethodName        = "/ai.v1.AiService/ChatStream"
+	AiService_ListChatThreads_FullMethodName   = "/ai.v1.AiService/ListChatThreads"
+	AiService_GetChatThread_FullMethodName     = "/ai.v1.AiService/GetChatThread"
+	AiService_DeleteChatThread_FullMethodName  = "/ai.v1.AiService/DeleteChatThread"
 )
 
 // AiServiceClient is the client API for AiService service.
@@ -41,6 +44,12 @@ type AiServiceClient interface {
 	// scratch — any text_delta already received for this turn should be discarded and
 	// display should start over. `done` marks the final chunk (empty text_delta).
 	ChatStream(ctx context.Context, in *ChatRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ChatChunk], error)
+	// Chatbot conversation history, scoped to the caller. ListChatThreads returns the
+	// caller's past conversations newest-first; GetChatThread returns one thread's full
+	// message list; DeleteChatThread removes a thread and its messages.
+	ListChatThreads(ctx context.Context, in *ListChatThreadsRequest, opts ...grpc.CallOption) (*ListChatThreadsResponse, error)
+	GetChatThread(ctx context.Context, in *GetChatThreadRequest, opts ...grpc.CallOption) (*GetChatThreadResponse, error)
+	DeleteChatThread(ctx context.Context, in *DeleteChatThreadRequest, opts ...grpc.CallOption) (*DeleteChatThreadResponse, error)
 }
 
 type aiServiceClient struct {
@@ -100,6 +109,36 @@ func (c *aiServiceClient) ChatStream(ctx context.Context, in *ChatRequest, opts 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type AiService_ChatStreamClient = grpc.ServerStreamingClient[ChatChunk]
 
+func (c *aiServiceClient) ListChatThreads(ctx context.Context, in *ListChatThreadsRequest, opts ...grpc.CallOption) (*ListChatThreadsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListChatThreadsResponse)
+	err := c.cc.Invoke(ctx, AiService_ListChatThreads_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aiServiceClient) GetChatThread(ctx context.Context, in *GetChatThreadRequest, opts ...grpc.CallOption) (*GetChatThreadResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetChatThreadResponse)
+	err := c.cc.Invoke(ctx, AiService_GetChatThread_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aiServiceClient) DeleteChatThread(ctx context.Context, in *DeleteChatThreadRequest, opts ...grpc.CallOption) (*DeleteChatThreadResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteChatThreadResponse)
+	err := c.cc.Invoke(ctx, AiService_DeleteChatThread_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AiServiceServer is the server API for AiService service.
 // All implementations should embed UnimplementedAiServiceServer
 // for forward compatibility.
@@ -116,6 +155,12 @@ type AiServiceServer interface {
 	// scratch — any text_delta already received for this turn should be discarded and
 	// display should start over. `done` marks the final chunk (empty text_delta).
 	ChatStream(*ChatRequest, grpc.ServerStreamingServer[ChatChunk]) error
+	// Chatbot conversation history, scoped to the caller. ListChatThreads returns the
+	// caller's past conversations newest-first; GetChatThread returns one thread's full
+	// message list; DeleteChatThread removes a thread and its messages.
+	ListChatThreads(context.Context, *ListChatThreadsRequest) (*ListChatThreadsResponse, error)
+	GetChatThread(context.Context, *GetChatThreadRequest) (*GetChatThreadResponse, error)
+	DeleteChatThread(context.Context, *DeleteChatThreadRequest) (*DeleteChatThreadResponse, error)
 }
 
 // UnimplementedAiServiceServer should be embedded to have
@@ -136,6 +181,15 @@ func (UnimplementedAiServiceServer) Chat(context.Context, *ChatRequest) (*ChatRe
 }
 func (UnimplementedAiServiceServer) ChatStream(*ChatRequest, grpc.ServerStreamingServer[ChatChunk]) error {
 	return status.Error(codes.Unimplemented, "method ChatStream not implemented")
+}
+func (UnimplementedAiServiceServer) ListChatThreads(context.Context, *ListChatThreadsRequest) (*ListChatThreadsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListChatThreads not implemented")
+}
+func (UnimplementedAiServiceServer) GetChatThread(context.Context, *GetChatThreadRequest) (*GetChatThreadResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetChatThread not implemented")
+}
+func (UnimplementedAiServiceServer) DeleteChatThread(context.Context, *DeleteChatThreadRequest) (*DeleteChatThreadResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteChatThread not implemented")
 }
 func (UnimplementedAiServiceServer) testEmbeddedByValue() {}
 
@@ -222,6 +276,60 @@ func _AiService_ChatStream_Handler(srv interface{}, stream grpc.ServerStream) er
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type AiService_ChatStreamServer = grpc.ServerStreamingServer[ChatChunk]
 
+func _AiService_ListChatThreads_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListChatThreadsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AiServiceServer).ListChatThreads(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AiService_ListChatThreads_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AiServiceServer).ListChatThreads(ctx, req.(*ListChatThreadsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AiService_GetChatThread_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetChatThreadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AiServiceServer).GetChatThread(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AiService_GetChatThread_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AiServiceServer).GetChatThread(ctx, req.(*GetChatThreadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AiService_DeleteChatThread_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteChatThreadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AiServiceServer).DeleteChatThread(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AiService_DeleteChatThread_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AiServiceServer).DeleteChatThread(ctx, req.(*DeleteChatThreadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AiService_ServiceDesc is the grpc.ServiceDesc for AiService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -240,6 +348,18 @@ var AiService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Chat",
 			Handler:    _AiService_Chat_Handler,
+		},
+		{
+			MethodName: "ListChatThreads",
+			Handler:    _AiService_ListChatThreads_Handler,
+		},
+		{
+			MethodName: "GetChatThread",
+			Handler:    _AiService_GetChatThread_Handler,
+		},
+		{
+			MethodName: "DeleteChatThread",
+			Handler:    _AiService_DeleteChatThread_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

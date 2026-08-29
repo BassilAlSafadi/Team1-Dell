@@ -10,7 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	aiv1 "gateway/internal/grpcgen/ai/v1"
 	"gateway/internal/middleware"
@@ -283,6 +285,107 @@ func writeSSE(w http.ResponseWriter, payload any) {
 	_, _ = w.Write([]byte("data: "))
 	_, _ = w.Write(data)
 	_, _ = w.Write([]byte("\n\n"))
+}
+
+// ListChatThreads handles GET /api/ai/chat/threads — the caller's past chatbot conversations,
+// newest first.
+func ListChatThreads(client aiv1.AiServiceClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID := middleware.UserID(r)
+		if userID == "" {
+			transform.WriteError(w, http.StatusUnauthorized, "Missing bearer token.")
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(transform.WithIdentity(r.Context(), r), 15*time.Second)
+		defer cancel()
+
+		resp, err := client.ListChatThreads(ctx, &aiv1.ListChatThreadsRequest{UserId: userID})
+		if err != nil {
+			transform.WriteGRPCError(w, err)
+			return
+		}
+
+		threads := make([]map[string]any, 0, len(resp.GetThreads()))
+		for _, t := range resp.GetThreads() {
+			threads = append(threads, map[string]any{
+				"threadId":  t.GetThreadId(),
+				"title":     t.GetTitle(),
+				"createdAt": rfc3339(t.GetCreatedAt()),
+				"updatedAt": rfc3339(t.GetUpdatedAt()),
+			})
+		}
+		transform.WriteJSON(w, http.StatusOK, threads)
+	}
+}
+
+// GetChatThread handles GET /api/ai/chat/threads/{threadId} — one conversation's messages.
+func GetChatThread(client aiv1.AiServiceClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID := middleware.UserID(r)
+		if userID == "" {
+			transform.WriteError(w, http.StatusUnauthorized, "Missing bearer token.")
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(transform.WithIdentity(r.Context(), r), 15*time.Second)
+		defer cancel()
+
+		resp, err := client.GetChatThread(ctx, &aiv1.GetChatThreadRequest{
+			UserId:   userID,
+			ThreadId: chi.URLParam(r, "threadId"),
+		})
+		if err != nil {
+			transform.WriteGRPCError(w, err)
+			return
+		}
+
+		messages := make([]map[string]any, 0, len(resp.GetMessages()))
+		for _, m := range resp.GetMessages() {
+			messages = append(messages, map[string]any{
+				"role":      m.GetRole(),
+				"content":   m.GetContent(),
+				"mediaName": m.GetMediaName(),
+				"mediaType": m.GetMediaType(),
+				"createdAt": rfc3339(m.GetCreatedAt()),
+			})
+		}
+		transform.WriteJSON(w, http.StatusOK, map[string]any{
+			"threadId": resp.GetThreadId(),
+			"title":    resp.GetTitle(),
+			"messages": messages,
+		})
+	}
+}
+
+// DeleteChatThread handles DELETE /api/ai/chat/threads/{threadId}.
+func DeleteChatThread(client aiv1.AiServiceClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID := middleware.UserID(r)
+		if userID == "" {
+			transform.WriteError(w, http.StatusUnauthorized, "Missing bearer token.")
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(transform.WithIdentity(r.Context(), r), 15*time.Second)
+		defer cancel()
+
+		if _, err := client.DeleteChatThread(ctx, &aiv1.DeleteChatThreadRequest{
+			UserId:   userID,
+			ThreadId: chi.URLParam(r, "threadId"),
+		}); err != nil {
+			transform.WriteGRPCError(w, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func rfc3339(ts *timestamppb.Timestamp) string {
+	if ts == nil || !ts.IsValid() {
+		return ""
+	}
+	return ts.AsTime().UTC().Format(time.RFC3339)
 }
 
 // maxChatMediaBytes caps a chat attachment. Kept under the classifier upload cap and well

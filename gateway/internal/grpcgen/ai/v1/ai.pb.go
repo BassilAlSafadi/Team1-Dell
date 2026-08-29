@@ -706,6 +706,438 @@ func (x *ChatChunk) GetReset_() bool {
 	return false
 }
 
+type ChatThreadSummary struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ThreadId      string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"` // derived from the first user message; may be empty for an empty thread
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChatThreadSummary) Reset() {
+	*x = ChatThreadSummary{}
+	mi := &file_ai_v1_ai_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChatThreadSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChatThreadSummary) ProtoMessage() {}
+
+func (x *ChatThreadSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_ai_v1_ai_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChatThreadSummary.ProtoReflect.Descriptor instead.
+func (*ChatThreadSummary) Descriptor() ([]byte, []int) {
+	return file_ai_v1_ai_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ChatThreadSummary) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
+	}
+	return ""
+}
+
+func (x *ChatThreadSummary) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *ChatThreadSummary) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *ChatThreadSummary) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
+type ChatHistoryMessage struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Role          string                 `protobuf:"bytes,1,opt,name=role,proto3" json:"role,omitempty"` // "human" or "ai"
+	Content       string                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
+	MediaName     string                 `protobuf:"bytes,3,opt,name=media_name,json=mediaName,proto3" json:"media_name,omitempty"`
+	MediaType     string                 `protobuf:"bytes,4,opt,name=media_type,json=mediaType,proto3" json:"media_type,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChatHistoryMessage) Reset() {
+	*x = ChatHistoryMessage{}
+	mi := &file_ai_v1_ai_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChatHistoryMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChatHistoryMessage) ProtoMessage() {}
+
+func (x *ChatHistoryMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_ai_v1_ai_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChatHistoryMessage.ProtoReflect.Descriptor instead.
+func (*ChatHistoryMessage) Descriptor() ([]byte, []int) {
+	return file_ai_v1_ai_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *ChatHistoryMessage) GetRole() string {
+	if x != nil {
+		return x.Role
+	}
+	return ""
+}
+
+func (x *ChatHistoryMessage) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+func (x *ChatHistoryMessage) GetMediaName() string {
+	if x != nil {
+		return x.MediaName
+	}
+	return ""
+}
+
+func (x *ChatHistoryMessage) GetMediaType() string {
+	if x != nil {
+		return x.MediaType
+	}
+	return ""
+}
+
+func (x *ChatHistoryMessage) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+type ListChatThreadsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListChatThreadsRequest) Reset() {
+	*x = ListChatThreadsRequest{}
+	mi := &file_ai_v1_ai_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListChatThreadsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListChatThreadsRequest) ProtoMessage() {}
+
+func (x *ListChatThreadsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_ai_v1_ai_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListChatThreadsRequest.ProtoReflect.Descriptor instead.
+func (*ListChatThreadsRequest) Descriptor() ([]byte, []int) {
+	return file_ai_v1_ai_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ListChatThreadsRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type ListChatThreadsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Threads       []*ChatThreadSummary   `protobuf:"bytes,1,rep,name=threads,proto3" json:"threads,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListChatThreadsResponse) Reset() {
+	*x = ListChatThreadsResponse{}
+	mi := &file_ai_v1_ai_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListChatThreadsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListChatThreadsResponse) ProtoMessage() {}
+
+func (x *ListChatThreadsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ai_v1_ai_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListChatThreadsResponse.ProtoReflect.Descriptor instead.
+func (*ListChatThreadsResponse) Descriptor() ([]byte, []int) {
+	return file_ai_v1_ai_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ListChatThreadsResponse) GetThreads() []*ChatThreadSummary {
+	if x != nil {
+		return x.Threads
+	}
+	return nil
+}
+
+type GetChatThreadRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ThreadId      string                 `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetChatThreadRequest) Reset() {
+	*x = GetChatThreadRequest{}
+	mi := &file_ai_v1_ai_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetChatThreadRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetChatThreadRequest) ProtoMessage() {}
+
+func (x *GetChatThreadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_ai_v1_ai_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetChatThreadRequest.ProtoReflect.Descriptor instead.
+func (*GetChatThreadRequest) Descriptor() ([]byte, []int) {
+	return file_ai_v1_ai_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *GetChatThreadRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *GetChatThreadRequest) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
+	}
+	return ""
+}
+
+type GetChatThreadResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ThreadId      string                 `protobuf:"bytes,1,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	Messages      []*ChatHistoryMessage  `protobuf:"bytes,3,rep,name=messages,proto3" json:"messages,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetChatThreadResponse) Reset() {
+	*x = GetChatThreadResponse{}
+	mi := &file_ai_v1_ai_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetChatThreadResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetChatThreadResponse) ProtoMessage() {}
+
+func (x *GetChatThreadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ai_v1_ai_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetChatThreadResponse.ProtoReflect.Descriptor instead.
+func (*GetChatThreadResponse) Descriptor() ([]byte, []int) {
+	return file_ai_v1_ai_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *GetChatThreadResponse) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
+	}
+	return ""
+}
+
+func (x *GetChatThreadResponse) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *GetChatThreadResponse) GetMessages() []*ChatHistoryMessage {
+	if x != nil {
+		return x.Messages
+	}
+	return nil
+}
+
+type DeleteChatThreadRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ThreadId      string                 `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteChatThreadRequest) Reset() {
+	*x = DeleteChatThreadRequest{}
+	mi := &file_ai_v1_ai_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteChatThreadRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteChatThreadRequest) ProtoMessage() {}
+
+func (x *DeleteChatThreadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_ai_v1_ai_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteChatThreadRequest.ProtoReflect.Descriptor instead.
+func (*DeleteChatThreadRequest) Descriptor() ([]byte, []int) {
+	return file_ai_v1_ai_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *DeleteChatThreadRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *DeleteChatThreadRequest) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
+	}
+	return ""
+}
+
+type DeleteChatThreadResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteChatThreadResponse) Reset() {
+	*x = DeleteChatThreadResponse{}
+	mi := &file_ai_v1_ai_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteChatThreadResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteChatThreadResponse) ProtoMessage() {}
+
+func (x *DeleteChatThreadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ai_v1_ai_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteChatThreadResponse.ProtoReflect.Descriptor instead.
+func (*DeleteChatThreadResponse) Descriptor() ([]byte, []int) {
+	return file_ai_v1_ai_proto_rawDescGZIP(), []int{17}
+}
+
 var File_ai_v1_ai_proto protoreflect.FileDescriptor
 
 const file_ai_v1_ai_proto_rawDesc = "" +
@@ -784,13 +1216,47 @@ const file_ai_v1_ai_proto_rawDesc = "" +
 	"text_delta\x18\x01 \x01(\tR\ttextDelta\x12\x1b\n" +
 	"\tthread_id\x18\x02 \x01(\tR\bthreadId\x12\x12\n" +
 	"\x04done\x18\x03 \x01(\bR\x04done\x12\x14\n" +
-	"\x05reset\x18\x04 \x01(\bR\x05reset2\x96\x02\n" +
+	"\x05reset\x18\x04 \x01(\bR\x05reset\"\xbc\x01\n" +
+	"\x11ChatThreadSummary\x12\x1b\n" +
+	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x14\n" +
+	"\x05title\x18\x02 \x01(\tR\x05title\x129\n" +
+	"\n" +
+	"created_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"\n" +
+	"updated_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xbb\x01\n" +
+	"\x12ChatHistoryMessage\x12\x12\n" +
+	"\x04role\x18\x01 \x01(\tR\x04role\x12\x18\n" +
+	"\acontent\x18\x02 \x01(\tR\acontent\x12\x1d\n" +
+	"\n" +
+	"media_name\x18\x03 \x01(\tR\tmediaName\x12\x1d\n" +
+	"\n" +
+	"media_type\x18\x04 \x01(\tR\tmediaType\x129\n" +
+	"\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"1\n" +
+	"\x16ListChatThreadsRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"M\n" +
+	"\x17ListChatThreadsResponse\x122\n" +
+	"\athreads\x18\x01 \x03(\v2\x18.ai.v1.ChatThreadSummaryR\athreads\"L\n" +
+	"\x14GetChatThreadRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1b\n" +
+	"\tthread_id\x18\x02 \x01(\tR\bthreadId\"\x81\x01\n" +
+	"\x15GetChatThreadResponse\x12\x1b\n" +
+	"\tthread_id\x18\x01 \x01(\tR\bthreadId\x12\x14\n" +
+	"\x05title\x18\x02 \x01(\tR\x05title\x125\n" +
+	"\bmessages\x18\x03 \x03(\v2\x19.ai.v1.ChatHistoryMessageR\bmessages\"O\n" +
+	"\x17DeleteChatThreadRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1b\n" +
+	"\tthread_id\x18\x02 \x01(\tR\bthreadId\"\x1a\n" +
+	"\x18DeleteChatThreadResponse2\x89\x04\n" +
 	"\tAiService\x12J\n" +
 	"\rClassifyWaste\x12\x1b.ai.v1.ClassifyWasteRequest\x1a\x1c.ai.v1.ClassifyWasteResponse\x12V\n" +
 	"\x11GetRecommendation\x12\x1f.ai.v1.GetRecommendationRequest\x1a .ai.v1.GetRecommendationResponse\x12/\n" +
 	"\x04Chat\x12\x12.ai.v1.ChatRequest\x1a\x13.ai.v1.ChatResponse\x124\n" +
 	"\n" +
-	"ChatStream\x12\x12.ai.v1.ChatRequest\x1a\x10.ai.v1.ChatChunk0\x01B2Z0notification-service/internal/grpcgen/ai/v1;aiv1b\x06proto3"
+	"ChatStream\x12\x12.ai.v1.ChatRequest\x1a\x10.ai.v1.ChatChunk0\x01\x12P\n" +
+	"\x0fListChatThreads\x12\x1d.ai.v1.ListChatThreadsRequest\x1a\x1e.ai.v1.ListChatThreadsResponse\x12J\n" +
+	"\rGetChatThread\x12\x1b.ai.v1.GetChatThreadRequest\x1a\x1c.ai.v1.GetChatThreadResponse\x12S\n" +
+	"\x10DeleteChatThread\x12\x1e.ai.v1.DeleteChatThreadRequest\x1a\x1f.ai.v1.DeleteChatThreadResponseB2Z0notification-service/internal/grpcgen/ai/v1;aiv1b\x06proto3"
 
 var (
 	file_ai_v1_ai_proto_rawDescOnce sync.Once
@@ -804,7 +1270,7 @@ func file_ai_v1_ai_proto_rawDescGZIP() []byte {
 	return file_ai_v1_ai_proto_rawDescData
 }
 
-var file_ai_v1_ai_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_ai_v1_ai_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_ai_v1_ai_proto_goTypes = []any{
 	(*ClassifyWasteRequest)(nil),      // 0: ai.v1.ClassifyWasteRequest
 	(*DetectedItem)(nil),              // 1: ai.v1.DetectedItem
@@ -816,28 +1282,47 @@ var file_ai_v1_ai_proto_goTypes = []any{
 	(*ChatRequest)(nil),               // 7: ai.v1.ChatRequest
 	(*ChatResponse)(nil),              // 8: ai.v1.ChatResponse
 	(*ChatChunk)(nil),                 // 9: ai.v1.ChatChunk
-	nil,                               // 10: ai.v1.ClassifyWasteResponse.VendorsByCategoryEntry
-	(*timestamppb.Timestamp)(nil),     // 11: google.protobuf.Timestamp
+	(*ChatThreadSummary)(nil),         // 10: ai.v1.ChatThreadSummary
+	(*ChatHistoryMessage)(nil),        // 11: ai.v1.ChatHistoryMessage
+	(*ListChatThreadsRequest)(nil),    // 12: ai.v1.ListChatThreadsRequest
+	(*ListChatThreadsResponse)(nil),   // 13: ai.v1.ListChatThreadsResponse
+	(*GetChatThreadRequest)(nil),      // 14: ai.v1.GetChatThreadRequest
+	(*GetChatThreadResponse)(nil),     // 15: ai.v1.GetChatThreadResponse
+	(*DeleteChatThreadRequest)(nil),   // 16: ai.v1.DeleteChatThreadRequest
+	(*DeleteChatThreadResponse)(nil),  // 17: ai.v1.DeleteChatThreadResponse
+	nil,                               // 18: ai.v1.ClassifyWasteResponse.VendorsByCategoryEntry
+	(*timestamppb.Timestamp)(nil),     // 19: google.protobuf.Timestamp
 }
 var file_ai_v1_ai_proto_depIdxs = []int32{
 	2,  // 0: ai.v1.VendorList.vendors:type_name -> ai.v1.Vendor
 	1,  // 1: ai.v1.ClassifyWasteResponse.items:type_name -> ai.v1.DetectedItem
-	10, // 2: ai.v1.ClassifyWasteResponse.vendors_by_category:type_name -> ai.v1.ClassifyWasteResponse.VendorsByCategoryEntry
-	11, // 3: ai.v1.GetRecommendationResponse.generated_at:type_name -> google.protobuf.Timestamp
-	3,  // 4: ai.v1.ClassifyWasteResponse.VendorsByCategoryEntry.value:type_name -> ai.v1.VendorList
-	0,  // 5: ai.v1.AiService.ClassifyWaste:input_type -> ai.v1.ClassifyWasteRequest
-	5,  // 6: ai.v1.AiService.GetRecommendation:input_type -> ai.v1.GetRecommendationRequest
-	7,  // 7: ai.v1.AiService.Chat:input_type -> ai.v1.ChatRequest
-	7,  // 8: ai.v1.AiService.ChatStream:input_type -> ai.v1.ChatRequest
-	4,  // 9: ai.v1.AiService.ClassifyWaste:output_type -> ai.v1.ClassifyWasteResponse
-	6,  // 10: ai.v1.AiService.GetRecommendation:output_type -> ai.v1.GetRecommendationResponse
-	8,  // 11: ai.v1.AiService.Chat:output_type -> ai.v1.ChatResponse
-	9,  // 12: ai.v1.AiService.ChatStream:output_type -> ai.v1.ChatChunk
-	9,  // [9:13] is the sub-list for method output_type
-	5,  // [5:9] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	18, // 2: ai.v1.ClassifyWasteResponse.vendors_by_category:type_name -> ai.v1.ClassifyWasteResponse.VendorsByCategoryEntry
+	19, // 3: ai.v1.GetRecommendationResponse.generated_at:type_name -> google.protobuf.Timestamp
+	19, // 4: ai.v1.ChatThreadSummary.created_at:type_name -> google.protobuf.Timestamp
+	19, // 5: ai.v1.ChatThreadSummary.updated_at:type_name -> google.protobuf.Timestamp
+	19, // 6: ai.v1.ChatHistoryMessage.created_at:type_name -> google.protobuf.Timestamp
+	10, // 7: ai.v1.ListChatThreadsResponse.threads:type_name -> ai.v1.ChatThreadSummary
+	11, // 8: ai.v1.GetChatThreadResponse.messages:type_name -> ai.v1.ChatHistoryMessage
+	3,  // 9: ai.v1.ClassifyWasteResponse.VendorsByCategoryEntry.value:type_name -> ai.v1.VendorList
+	0,  // 10: ai.v1.AiService.ClassifyWaste:input_type -> ai.v1.ClassifyWasteRequest
+	5,  // 11: ai.v1.AiService.GetRecommendation:input_type -> ai.v1.GetRecommendationRequest
+	7,  // 12: ai.v1.AiService.Chat:input_type -> ai.v1.ChatRequest
+	7,  // 13: ai.v1.AiService.ChatStream:input_type -> ai.v1.ChatRequest
+	12, // 14: ai.v1.AiService.ListChatThreads:input_type -> ai.v1.ListChatThreadsRequest
+	14, // 15: ai.v1.AiService.GetChatThread:input_type -> ai.v1.GetChatThreadRequest
+	16, // 16: ai.v1.AiService.DeleteChatThread:input_type -> ai.v1.DeleteChatThreadRequest
+	4,  // 17: ai.v1.AiService.ClassifyWaste:output_type -> ai.v1.ClassifyWasteResponse
+	6,  // 18: ai.v1.AiService.GetRecommendation:output_type -> ai.v1.GetRecommendationResponse
+	8,  // 19: ai.v1.AiService.Chat:output_type -> ai.v1.ChatResponse
+	9,  // 20: ai.v1.AiService.ChatStream:output_type -> ai.v1.ChatChunk
+	13, // 21: ai.v1.AiService.ListChatThreads:output_type -> ai.v1.ListChatThreadsResponse
+	15, // 22: ai.v1.AiService.GetChatThread:output_type -> ai.v1.GetChatThreadResponse
+	17, // 23: ai.v1.AiService.DeleteChatThread:output_type -> ai.v1.DeleteChatThreadResponse
+	17, // [17:24] is the sub-list for method output_type
+	10, // [10:17] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_ai_v1_ai_proto_init() }
@@ -854,7 +1339,7 @@ func file_ai_v1_ai_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ai_v1_ai_proto_rawDesc), len(file_ai_v1_ai_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

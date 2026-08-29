@@ -132,3 +132,71 @@ class ChatChunk(_message.Message):
     done: bool
     reset: bool
     def __init__(self, text_delta: _Optional[str] = ..., thread_id: _Optional[str] = ..., done: bool = ..., reset: bool = ...) -> None: ...
+
+class ChatThreadSummary(_message.Message):
+    __slots__ = ("thread_id", "title", "created_at", "updated_at")
+    THREAD_ID_FIELD_NUMBER: _ClassVar[int]
+    TITLE_FIELD_NUMBER: _ClassVar[int]
+    CREATED_AT_FIELD_NUMBER: _ClassVar[int]
+    UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
+    thread_id: str
+    title: str
+    created_at: _timestamp_pb2.Timestamp
+    updated_at: _timestamp_pb2.Timestamp
+    def __init__(self, thread_id: _Optional[str] = ..., title: _Optional[str] = ..., created_at: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+
+class ChatHistoryMessage(_message.Message):
+    __slots__ = ("role", "content", "media_name", "media_type", "created_at")
+    ROLE_FIELD_NUMBER: _ClassVar[int]
+    CONTENT_FIELD_NUMBER: _ClassVar[int]
+    MEDIA_NAME_FIELD_NUMBER: _ClassVar[int]
+    MEDIA_TYPE_FIELD_NUMBER: _ClassVar[int]
+    CREATED_AT_FIELD_NUMBER: _ClassVar[int]
+    role: str
+    content: str
+    media_name: str
+    media_type: str
+    created_at: _timestamp_pb2.Timestamp
+    def __init__(self, role: _Optional[str] = ..., content: _Optional[str] = ..., media_name: _Optional[str] = ..., media_type: _Optional[str] = ..., created_at: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+
+class ListChatThreadsRequest(_message.Message):
+    __slots__ = ("user_id",)
+    USER_ID_FIELD_NUMBER: _ClassVar[int]
+    user_id: str
+    def __init__(self, user_id: _Optional[str] = ...) -> None: ...
+
+class ListChatThreadsResponse(_message.Message):
+    __slots__ = ("threads",)
+    THREADS_FIELD_NUMBER: _ClassVar[int]
+    threads: _containers.RepeatedCompositeFieldContainer[ChatThreadSummary]
+    def __init__(self, threads: _Optional[_Iterable[_Union[ChatThreadSummary, _Mapping]]] = ...) -> None: ...
+
+class GetChatThreadRequest(_message.Message):
+    __slots__ = ("user_id", "thread_id")
+    USER_ID_FIELD_NUMBER: _ClassVar[int]
+    THREAD_ID_FIELD_NUMBER: _ClassVar[int]
+    user_id: str
+    thread_id: str
+    def __init__(self, user_id: _Optional[str] = ..., thread_id: _Optional[str] = ...) -> None: ...
+
+class GetChatThreadResponse(_message.Message):
+    __slots__ = ("thread_id", "title", "messages")
+    THREAD_ID_FIELD_NUMBER: _ClassVar[int]
+    TITLE_FIELD_NUMBER: _ClassVar[int]
+    MESSAGES_FIELD_NUMBER: _ClassVar[int]
+    thread_id: str
+    title: str
+    messages: _containers.RepeatedCompositeFieldContainer[ChatHistoryMessage]
+    def __init__(self, thread_id: _Optional[str] = ..., title: _Optional[str] = ..., messages: _Optional[_Iterable[_Union[ChatHistoryMessage, _Mapping]]] = ...) -> None: ...
+
+class DeleteChatThreadRequest(_message.Message):
+    __slots__ = ("user_id", "thread_id")
+    USER_ID_FIELD_NUMBER: _ClassVar[int]
+    THREAD_ID_FIELD_NUMBER: _ClassVar[int]
+    user_id: str
+    thread_id: str
+    def __init__(self, user_id: _Optional[str] = ..., thread_id: _Optional[str] = ...) -> None: ...
+
+class DeleteChatThreadResponse(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...

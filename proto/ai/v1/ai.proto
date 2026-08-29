@@ -18,6 +18,13 @@ service AiService {
   // scratch — any text_delta already received for this turn should be discarded and
   // display should start over. `done` marks the final chunk (empty text_delta).
   rpc ChatStream(ChatRequest) returns (stream ChatChunk);
+
+  // Chatbot conversation history, scoped to the caller. ListChatThreads returns the
+  // caller's past conversations newest-first; GetChatThread returns one thread's full
+  // message list; DeleteChatThread removes a thread and its messages.
+  rpc ListChatThreads(ListChatThreadsRequest) returns (ListChatThreadsResponse);
+  rpc GetChatThread(GetChatThreadRequest) returns (GetChatThreadResponse);
+  rpc DeleteChatThread(DeleteChatThreadRequest) returns (DeleteChatThreadResponse);
 }
 
 message ClassifyWasteRequest {
@@ -93,3 +100,44 @@ message ChatChunk {
   bool done = 3;
   bool reset = 4;
 }
+
+message ChatThreadSummary {
+  string thread_id = 1;
+  string title = 2;   // derived from the first user message; may be empty for an empty thread
+  google.protobuf.Timestamp created_at = 3;
+  google.protobuf.Timestamp updated_at = 4;
+}
+
+message ChatHistoryMessage {
+  string role = 1;    // "human" or "ai"
+  string content = 2;
+  string media_name = 3;
+  string media_type = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message ListChatThreadsRequest {
+  string user_id = 1;
+}
+
+message ListChatThreadsResponse {
+  repeated ChatThreadSummary threads = 1;
+}
+
+message GetChatThreadRequest {
+  string user_id = 1;
+  string thread_id = 2;
+}
+
+message GetChatThreadResponse {
+  string thread_id = 1;
+  string title = 2;
+  repeated ChatHistoryMessage messages = 3;
+}
+
+message DeleteChatThreadRequest {
+  string user_id = 1;
+  string thread_id = 2;
+}
+
+message DeleteChatThreadResponse {}

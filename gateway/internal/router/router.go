@@ -158,6 +158,9 @@ func New(cfg *config.Config, clients *grpcclients.Clients, limiter ratelimit.Lim
 		r.Get("/api/ai/recommendation", handlers.Recommendation(clients.Ai))
 		r.Post("/api/ai/chat", handlers.Chat(clients.Ai))
 		r.Post("/api/ai/chat/stream", handlers.ChatStream(clients.Ai))
+		r.Get("/api/ai/chat/threads", handlers.ListChatThreads(clients.Ai))
+		r.Get("/api/ai/chat/threads/{threadId}", handlers.GetChatThread(clients.Ai))
+		r.Delete("/api/ai/chat/threads/{threadId}", handlers.DeleteChatThread(clients.Ai))
 	})
 
 	// --- marketplace-service (REST-only, no gRPC server — same proxy-only shape as
