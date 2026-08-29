@@ -38,7 +38,10 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./data/uploads:/data/uploads
+      # Named volume (not a bind mount): it inherits the image's app:app ownership of
+      # /data/uploads on first use, so the non-root gateway process can write to it, and it
+      # persists across `up -d --build` / `down` (removed only by `down -v`).
+      - gateway-uploads:/data/uploads
     depends_on: [auth-service, transaction-service, messaging-service, notification-service, ai-service, marketplace-service]
     networks: [mesh]
 
@@ -120,3 +123,6 @@ services:
 networks:
   mesh:
     driver: bridge
+
+volumes:
+  gateway-uploads:

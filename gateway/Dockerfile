@@ -16,6 +16,10 @@ WORKDIR /app
 
 COPY --from=build /out/gateway ./gateway
 
+# Attachment store (POST/GET /api/uploads). Created owned by `app` here so a fresh named
+# volume mounted at this path inherits that ownership and the non-root process can write.
+RUN mkdir -p /data/uploads && chown -R app:app /data
+
 USER app
 EXPOSE 8080
 CMD ["./gateway"]
