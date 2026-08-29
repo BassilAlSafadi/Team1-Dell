@@ -1,4 +1,11 @@
-import { useRef, useState, type FormEvent } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { streamChat } from '../lib/api'
@@ -20,6 +27,38 @@ type Message = {
 
 // A chat attachment is capped at 20 MB — matches ai-service's MAX_CHAT_MEDIA_BYTES.
 const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024
+
+// The chat panel is user-resizable from its top-left corner; the chosen size is remembered.
+const PANEL_SIZE_KEY = 'recyclehub.chatbot.size'
+const PANEL_MIN_W = 300
+const PANEL_MIN_H = 360
+const PANEL_DEFAULT_SIZE = { w: 340, h: 440 }
+
+type PanelSize = { w: number; h: number }
+
+function clampPanelSize({ w, h }: PanelSize): PanelSize {
+  const maxW = Math.max(PANEL_MIN_W, window.innerWidth - 32)
+  const maxH = Math.max(PANEL_MIN_H, window.innerHeight - 120)
+  return {
+    w: Math.round(Math.min(Math.max(w, PANEL_MIN_W), maxW)),
+    h: Math.round(Math.min(Math.max(h, PANEL_MIN_H), maxH)),
+  }
+}
+
+function loadPanelSize(): PanelSize {
+  try {
+    const raw = localStorage.getItem(PANEL_SIZE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<PanelSize>
+      if (typeof parsed.w === 'number' && typeof parsed.h === 'number') {
+        return clampPanelSize({ w: parsed.w, h: parsed.h })
+      }
+    }
+  } catch {
+    // no stored size / unreadable storage — fall through to the default
+  }
+  return PANEL_DEFAULT_SIZE
+}
 
 function AttachmentView({ attachment }: { attachment: Attachment }) {
   if (attachment.type.startsWith('image/')) {
@@ -55,6 +94,75 @@ function ChatbotWidget() {
   const [isSending, setIsSending] = useState(false)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const [panelSize, setPanelSize] = useState<PanelSize>(loadPanelSize)
+  const resizeStart = useRef<{ x: number; y: number; w: number; h: number } | null>(null)
+
+  // Remember the chosen size. Writing on every drag frame is cheap and avoids the stale
+  // closure a persist-on-pointerup would capture.
+  useEffect(() => {
+    try {
+      localStorage.setItem(PANEL_SIZE_KEY, JSON.stringify(panelSize))
+    } catch {
+      // storage unavailable (private window, blocked) — size just won't persist
+    }
+  }, [panelSize])
+
+  // Keep the panel on-screen if the viewport shrinks below the last chosen size.
+  useEffect(() => {
+    const onResize = () => setPanelSize((cur) => clampPanelSize(cur))
+    window.addEventListener('resize', onResize)
+    return () => {
+      window.removeEventListener('resize', onResize)
+      // In case a drag was interrupted by unmount / the panel closing.
+      document.body.style.userSelect = ''
+      document.body.style.cursor = ''
+    }
+  }, [])
+
+  const onResizePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    resizeStart.current = { x: event.clientX, y: event.clientY, w: panelSize.w, h: panelSize.h }
+    // Stop the drag from selecting page text / flickering the cursor.
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = 'nwse-resize'
+  }
+
+  const onResizePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const start = resizeStart.current
+    if (!start) return
+    // The panel is pinned to the bottom-right, so dragging the top-left handle left/up
+    // grows it: add the distance the pointer has travelled back toward the origin.
+    setPanelSize(
+      clampPanelSize({
+        w: start.w + (start.x - event.clientX),
+        h: start.h + (start.y - event.clientY),
+      }),
+    )
+  }
+
+  const onResizePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!resizeStart.current) return
+    resizeStart.current = null
+    event.currentTarget.releasePointerCapture(event.pointerId)
+    document.body.style.userSelect = ''
+    document.body.style.cursor = ''
+  }
+
+  const onResizeKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const step = 24
+    const deltas: Record<string, [number, number]> = {
+      ArrowLeft: [step, 0],
+      ArrowRight: [-step, 0],
+      ArrowUp: [0, step],
+      ArrowDown: [0, -step],
+    }
+    const delta = deltas[event.key]
+    if (!delta) return
+    event.preventDefault()
+    setPanelSize((cur) => clampPanelSize({ w: cur.w + delta[0], h: cur.h + delta[1] }))
+  }
 
   const pickFile = (file: File | undefined) => {
     if (!file) return
@@ -127,7 +235,28 @@ function ChatbotWidget() {
   return (
     <div className="chatbot-widget">
       {isOpen && (
-        <div className="chatbot-panel" role="dialog" aria-label="RecycleHub Assistant">
+        <div
+          className="chatbot-panel"
+          role="dialog"
+          aria-label="RecycleHub Assistant"
+          style={{ width: panelSize.w, height: panelSize.h }}
+        >
+          <div
+            className="chatbot-resize-handle"
+            role="button"
+            tabIndex={0}
+            aria-label="Resize chat window (use arrow keys)"
+            title="Drag to resize"
+            onPointerDown={onResizePointerDown}
+            onPointerMove={onResizePointerMove}
+            onPointerUp={onResizePointerUp}
+            onKeyDown={onResizeKeyDown}
+          >
+            <svg viewBox="0 0 10 10" aria-hidden="true">
+              <path d="M9 1 1 9M9 5 5 9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            </svg>
+          </div>
+
           <div className="chatbot-header">
             <div className="chatbot-header-info">
               <span className="chatbot-avatar" aria-hidden="true">
