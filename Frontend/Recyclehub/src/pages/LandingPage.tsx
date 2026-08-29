@@ -205,7 +205,7 @@ function LandingPage() {
               </span>
               <span className="brand-name">RecycleHub</span>
             </div>
-            <p className="footer-slogan">Monetize your Trash</p>
+            <p className="footer-slogan">Monetize your Waste</p>
           </div>
         </div>
 
