@@ -53,6 +53,17 @@ public class AuthController : ControllerBase
     }
 
     [Authorize]
+    [HttpDelete("me")]
+    public async Task<IActionResult> DeleteMe(DeleteAccountRequest request, CancellationToken ct)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue("sub")!);
+
+        await _authenticationService.DeleteAccountAsync(userId, request.Confirmation, ct);
+        return NoContent();
+    }
+
+    [Authorize]
     [HttpGet("me")]
     public async Task<ActionResult<UserResponse>> Me(CancellationToken ct)
     {

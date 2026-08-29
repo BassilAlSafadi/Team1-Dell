@@ -286,6 +286,15 @@
   }
 }
 
+.dropdown-link-danger {
+  color: var(--danger);
+
+  &:hover {
+    color: var(--danger);
+    opacity: 0.8;
+  }
+}
+
 .notif-item {
   display: block;
   width: 100%;

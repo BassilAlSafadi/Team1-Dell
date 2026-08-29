@@ -90,6 +90,7 @@ func New(cfg *config.Config, clients *grpcclients.Clients, limiter ratelimit.Lim
 		r.Get("/api/vendors/{vendorId}/profile", handlers.VendorProfile(clients.Auth))
 
 		r.With(requireAuth).Get("/api/auth/me", handlers.Me(clients.Auth))
+		r.With(requireAuth).Delete("/api/auth/me", authProxy.ServeHTTP)
 		r.With(requireAuth).Put("/api/vendors/{vendorId}/reviews", authProxy.ServeHTTP)
 		r.With(requireAuth).Delete("/api/vendors/{vendorId}/reviews", authProxy.ServeHTTP)
 

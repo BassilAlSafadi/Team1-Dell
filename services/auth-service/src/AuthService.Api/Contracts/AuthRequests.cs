@@ -28,6 +28,11 @@ public record RefreshRequest(
 public record LogoutRequest(
     [Required, StringLength(512)] string RefreshToken);
 
+// Confirmation is the account's own email, retyped by the user (the frontend blocks paste so
+// it has to be typed by hand). Checked server-side too — a mismatch is a 400, never a delete.
+public record DeleteAccountRequest(
+    [Required, StringLength(254)] string Confirmation);
+
 public record SendVerificationCodeRequest(
     [Required, EmailAddress, StringLength(254)] string Email);
 

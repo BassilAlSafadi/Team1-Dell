@@ -1,0 +1,71 @@
+/* Reuses the modal shell (.modal-overlay/.modal-card/.modal-actions) from AddWasteModal. */
+@import './AddWasteModal.css';
+
+.confirm-dialog {
+  max-width: 400px;
+}
+
+.confirm-dialog-body {
+  margin-top: 16px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text-h);
+}
+
+.confirm-dialog-body p {
+  margin: 0 0 10px;
+}
+
+.confirm-dialog-body p:last-child {
+  margin-bottom: 0;
+}
+
+/* Destructive confirm button — shared by the sign-out and delete-account dialogs. */
+.btn-danger {
+  padding: 12px 20px;
+  border: none;
+  border-radius: 10px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+}
+
+.btn-danger:hover {
+  background: #8f1e17;
+}
+
+.btn-danger:focus-visible {
+  outline: 2px solid var(--danger);
+  outline-offset: 2px;
+}
+
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* --- delete-account specifics --- */
+.delete-account-warning {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--danger-light);
+  color: var(--danger);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.delete-account-phrase {
+  display: block;
+  margin: 4px 0 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-h);
+  font-weight: 700;
+  user-select: none;
+}

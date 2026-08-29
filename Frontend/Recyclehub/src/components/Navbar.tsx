@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { api } from '../lib/api'
+import ConfirmDialog from './ConfirmDialog'
+import DeleteAccountModal from './DeleteAccountModal'
 import './Navbar.css'
 
 type NavbarVariant = 'business' | 'vendor'
@@ -128,6 +130,7 @@ function Navbar({ variant: variantOverride }: { variant?: NavbarVariant }) {
   const variant: NavbarVariant = variantOverride ?? (isVendor ? 'vendor' : 'business')
 
   const [openMenu, setOpenMenu] = useState<'notifications' | 'account' | 'mobile-nav' | null>(null)
+  const [accountAction, setAccountAction] = useState<'signout' | 'delete' | null>(null)
   const [notifications, setNotifications] = useState<NotificationDto[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
 
@@ -195,8 +198,19 @@ function Navbar({ variant: variantOverride }: { variant?: NavbarVariant }) {
     if (destination) navigate(destination.path, { state: destination.state })
   }
 
-  const handleLogout = async () => {
+  const openAccountAction = (action: 'signout' | 'delete') => {
+    setOpenMenu(null)
+    setAccountAction(action)
+  }
+
+  const handleConfirmLogout = async () => {
     await logout()
+    setAccountAction(null)
+    navigate('/')
+  }
+
+  const handleAccountDeleted = () => {
+    setAccountAction(null)
     navigate('/')
   }
 
@@ -334,8 +348,19 @@ function Navbar({ variant: variantOverride }: { variant?: NavbarVariant }) {
               {openMenu === 'account' && (
                 <div className="dropdown account-dropdown">
                   <p className="dropdown-title">{accountLabel}</p>
-                  <button type="button" className="dropdown-link" onClick={handleLogout}>
+                  <button
+                    type="button"
+                    className="dropdown-link"
+                    onClick={() => openAccountAction('signout')}
+                  >
                     Logout
+                  </button>
+                  <button
+                    type="button"
+                    className="dropdown-link dropdown-link-danger"
+                    onClick={() => openAccountAction('delete')}
+                  >
+                    Delete account
                   </button>
                 </div>
               )}
@@ -371,6 +396,24 @@ function Navbar({ variant: variantOverride }: { variant?: NavbarVariant }) {
           className="dropdown-backdrop"
           aria-label="Close menu"
           onClick={() => setOpenMenu(null)}
+        />
+      )}
+
+      {accountAction === 'signout' && (
+        <ConfirmDialog
+          title="Sign out?"
+          message="You'll need to sign in again to get back to your dashboard."
+          confirmLabel="Sign out"
+          danger
+          onConfirm={handleConfirmLogout}
+          onClose={() => setAccountAction(null)}
+        />
+      )}
+
+      {accountAction === 'delete' && (
+        <DeleteAccountModal
+          onClose={() => setAccountAction(null)}
+          onDeleted={handleAccountDeleted}
         />
       )}
     </header>

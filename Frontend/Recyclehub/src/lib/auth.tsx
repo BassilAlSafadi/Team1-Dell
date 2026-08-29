@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { api, setAccessToken, setRefreshToken, setAuthHandlers } from './api'
+import { api, request, setAccessToken, setRefreshToken, setAuthHandlers } from './api'
 
 const STORAGE_KEY = 'recyclehub.auth'
 
@@ -94,6 +94,9 @@ type AuthContextValue = {
   confirmEmail: (email: string, code: string) => Promise<void>
   resendVerification: (email: string) => Promise<void>
   logout: () => Promise<void>
+  /** Permanently deletes the signed-in account. `confirmation` must be the account email,
+   * retyped by the user. Clears the local session on success. */
+  deleteAccount: (confirmation: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -171,6 +174,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const deleteAccount = async (confirmation: string) => {
+    await request<void>('/api/auth/me', { method: 'DELETE', body: { confirmation } })
+    storeTokens(null)
+    setTokens(null)
+    setUser(null)
+  }
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -183,6 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       confirmEmail,
       resendVerification,
       logout,
+      deleteAccount,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [user, tokens],

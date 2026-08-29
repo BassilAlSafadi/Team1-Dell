@@ -308,6 +308,38 @@ public class AuthenticationService : IAuthenticationService
         }
     }
 
+    public async Task DeleteAccountAsync(Guid userId, string confirmation, CancellationToken ct)
+    {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.UserId == userId, ct)
+            ?? throw new AuthDomainException(HttpStatusCode.NotFound, "User not found.");
+
+        // The user retyped this by hand (paste is blocked in the UI). Re-check it here so the
+        // endpoint can't be driven to delete an account without that deliberate confirmation.
+        if (!string.Equals(confirmation?.Trim(), user.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new AuthDomainException(
+                HttpStatusCode.BadRequest,
+                "Confirmation text does not match your account email.");
+        }
+
+        // No ON DELETE CASCADE is defined on the child tables, and email_verification /
+        // password_reset aren't even mapped as relationships — so every dependent row is
+        // removed explicitly, all-or-nothing inside one transaction.
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+
+        await _db.Reviews.Where(r => r.VendorId == userId || r.ReviewerId == userId).ExecuteDeleteAsync(ct);
+        await _db.EmailVerifications.Where(e => e.UserId == userId).ExecuteDeleteAsync(ct);
+        await _db.PasswordResets.Where(p => p.UserId == userId).ExecuteDeleteAsync(ct);
+        await _db.Sessions.Where(s => s.UserId == userId).ExecuteDeleteAsync(ct);
+        await _db.UserRoles.Where(ur => ur.UserId == userId).ExecuteDeleteAsync(ct);
+        await _db.AuthIdentities.Where(i => i.UserId == userId).ExecuteDeleteAsync(ct);
+        await _db.Users.Where(u => u.UserId == userId).ExecuteDeleteAsync(ct);
+
+        await tx.CommitAsync(ct);
+
+        await InvalidateUserCacheAsync(userId);
+    }
+
     public async Task<UserResponse> GetUserAsync(Guid userId, CancellationToken ct)
     {
         // Pure TTL-expiry cache-aside (see REDIS_INTEGRATION_PLAN.md §2) — never caches the

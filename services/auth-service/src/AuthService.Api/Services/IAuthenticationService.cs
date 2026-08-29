@@ -9,5 +9,6 @@ public interface IAuthenticationService
     Task<TokenResponse> LoginWithGoogleAsync(string idToken, CancellationToken ct);
     Task<TokenResponse> RefreshAsync(string refreshToken, CancellationToken ct);
     Task LogoutAsync(string refreshToken, CancellationToken ct);
+    Task DeleteAccountAsync(Guid userId, string confirmation, CancellationToken ct);
     Task<UserResponse> GetUserAsync(Guid userId, CancellationToken ct);
 }
