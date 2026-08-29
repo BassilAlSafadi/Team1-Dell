@@ -61,9 +61,18 @@
 .vendor-card {
   display: flex;
   flex-direction: column;
-  background: var(--surface);
+  background: #fff;
+  border: 1px solid var(--border);
   border-radius: 16px;
   padding: 24px;
+  box-shadow: rgba(15, 26, 19, 0.05) 0 2px 8px -2px;
+  transition: box-shadow 0.15s, border-color 0.15s, transform 0.15s;
+}
+
+.vendor-card:hover {
+  border-color: #c5ddcd;
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
 }
 
 .vendor-card-top {
@@ -106,4 +115,5 @@
 .vendor-card .btn-secondary {
   margin-top: 20px;
   align-self: flex-start;
+  background: var(--surface);
 }

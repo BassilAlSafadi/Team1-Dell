@@ -21,9 +21,18 @@
 .request-card {
   display: flex;
   flex-direction: column;
-  background: var(--surface);
+  background: #fff;
+  border: 1px solid var(--border);
   border-radius: 16px;
   padding: 24px;
+  box-shadow: rgba(15, 26, 19, 0.05) 0 2px 8px -2px;
+  transition: box-shadow 0.15s, border-color 0.15s, transform 0.15s;
+}
+
+.request-card:hover {
+  border-color: #c5ddcd;
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
 }
 
 .request-card-top {
@@ -92,4 +101,8 @@
 .request-card .btn-primary,
 .request-card .btn-secondary {
   align-self: flex-start;
+}
+
+.request-card .btn-secondary {
+  background: var(--surface);
 }
