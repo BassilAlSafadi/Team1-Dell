@@ -7,9 +7,10 @@ Two independent fallback axes, tried together via call_with_gemini_fallback():
   unavailable/overloaded/quota-exhausted right now" error (a different model could
   still work — Gemini's free-tier quota is scoped per model, not per key, so this is
   also where a 429/RESOURCE_EXHAUSTED belongs).
-- PRIMARY_API_KEY -> FALLBACK_API_KEY, advanced only on an error about the key itself
-  (invalid/unauthorized) — a quota error doesn't imply the key is bad, so it stays on
-  the model axis instead of skipping straight to a different key."""
+- API_KEYS: GEMINI_API_KEY (always the first go-to) then GEMINI_API_KEY_FALLBACK,
+  GEMINI_API_KEY_FALLBACK_2, _3, ... in that order, advanced only on an error about the
+  key itself (invalid/unauthorized) — a quota error doesn't imply the key is bad, so it
+  stays on the model axis instead of skipping straight to a different key."""
 
 import os
 
@@ -17,13 +18,42 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-PRIMARY_API_KEY = os.getenv("GEMINI_API_KEY")
-if not PRIMARY_API_KEY or PRIMARY_API_KEY == "CHANGE_ME":
-    raise ValueError("GEMINI_API_KEY not found in .env")
+# Max GEMINI_API_KEY_FALLBACK_<n> suffix to look for (n from 2 upward).
+_MAX_FALLBACK_KEYS = 10
 
-FALLBACK_API_KEY = os.getenv("GEMINI_API_KEY_FALLBACK") or None
-if FALLBACK_API_KEY == "CHANGE_ME":
-    FALLBACK_API_KEY = None
+
+def _clean_key(value: str | None) -> str | None:
+    value = (value or "").strip()
+    if not value or value == "CHANGE_ME":
+        return None
+    return value
+
+
+def _collect_api_keys() -> list[str]:
+    """Every configured Gemini key, best first: GEMINI_API_KEY, then
+    GEMINI_API_KEY_FALLBACK and GEMINI_API_KEY_FALLBACK_2.._N. Deduped, first position
+    wins."""
+    primary = _clean_key(os.getenv("GEMINI_API_KEY"))
+    if not primary:
+        raise ValueError("GEMINI_API_KEY not found in .env")
+
+    ordered = [primary]
+    fallback = _clean_key(os.getenv("GEMINI_API_KEY_FALLBACK"))
+    if fallback:
+        ordered.append(fallback)
+    for i in range(2, _MAX_FALLBACK_KEYS + 1):
+        extra = _clean_key(os.getenv(f"GEMINI_API_KEY_FALLBACK_{i}"))
+        if extra:
+            ordered.append(extra)
+
+    return list(dict.fromkeys(ordered))
+
+
+API_KEYS = _collect_api_keys()
+
+# Back-compat single-name exports (chatbot/config.py re-exports these).
+PRIMARY_API_KEY = API_KEYS[0]
+FALLBACK_API_KEY = API_KEYS[1] if len(API_KEYS) > 1 else None
 
 MODEL_FALLBACK_CHAIN = [
     "gemini-3.6-flash",
@@ -91,9 +121,9 @@ def call_with_gemini_fallback(build_and_call):
     """build_and_call(model: str, api_key: str) -> T — (re)builds whatever client(s) are
     needed for this attempt and performs the actual Gemini call, raising on failure.
 
-    Tries MODEL_FALLBACK_CHAIN x [PRIMARY_API_KEY, FALLBACK_API_KEY] in priority order,
-    model-major: every non-exhausted key is tried against gemini-3.6-flash before moving
-    to gemini-3.5-flash, and so on. A key that fails with an auth-type error (invalid/
+    Tries MODEL_FALLBACK_CHAIN x API_KEYS in priority order, model-major: every
+    non-exhausted key is tried against gemini-3.6-flash before moving to
+    gemini-3.5-flash, and so on. A key that fails with an auth-type error (invalid/
     unauthorized) is marked exhausted and skipped for every remaining model (retrying a
     dead key against a different model wastes a call — the key is the problem, not the
     model). A quota/overload/unavailable error instead advances to the next model on the
@@ -101,7 +131,7 @@ def call_with_gemini_fallback(build_and_call):
     exception once nothing left is worth trying, or immediately for any error that isn't
     a recognized key/model-type failure at all.
     """
-    keys = [k for k in (PRIMARY_API_KEY, FALLBACK_API_KEY) if k]
+    keys = list(API_KEYS)
     last_exc: Exception | None = None
     key_idx = 0
 
